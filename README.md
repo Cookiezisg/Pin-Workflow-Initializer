@@ -1,10 +1,17 @@
 # Pin Workflow Initializer
 
-A powerful Chrome extension that helps you instantly organize your workspace by managing pinned tabs and tab groups across windows with a single click or keyboard shortcut.
-  
-## 🎯 Purpose
+[![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-4285F4?logo=googlechrome&logoColor=white)](https://chrome.google.com/webstore/category/extensions)
+![Manifest V3](https://img.shields.io/badge/Manifest-V3-0F9D58)
+![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-222222)
+![License](https://img.shields.io/badge/License-MIT-2EA44F)
 
-Perfect for professionals who:
+Pin Workflow Initializer is a Chrome extension that instantly organizes your workspace by managing pinned tabs and tab groups across windows with one click or a keyboard shortcut.
+
+![Screenshot](screenshot.png)
+  
+## Purpose
+
+Built for professionals who:
 
 - Need quick access to multiple essential websites daily
 - Want to maintain a clean and organized browser workspace
@@ -12,7 +19,7 @@ Perfect for professionals who:
 - Work with multiple Chrome windows but want centralized tab management
 - Use Chrome's tab groups feature for better organization
 
-## ✨ Key Features
+## Key Features
 
 - **One-Click Initialization**: Instantly set up your workspace via icon click or keyboard shortcut
 - **Smart Window Management**: Automatically consolidates all tabs into your active window
@@ -26,13 +33,13 @@ Perfect for professionals who:
   - Minimal API calls for better performance
 - **Keyboard First**: Quick access via Alt+Shift+C (customizable)
 
-## 🚀 Installation
+## Installation
 
 1. Open Chrome Extensions page (`chrome://extensions/`)
 2. Enable "Developer mode" in the top right
 3. Click "Load unpacked" and select the `pin_workflow_initializer` directory
 
-## 💡 Usage
+## Usage
 
 ### Quick Start
 
@@ -64,7 +71,7 @@ Either method will:
 4. Press your desired key combination
 5. The change saves automatically
 
-## 📌 Default Configuration
+## Default Configuration
 
 The extension comes pre-configured with essential productivity tools:
 
@@ -72,7 +79,7 @@ The extension comes pre-configured with essential productivity tools:
 - Google Calendar - Schedule management
 - Google Drive - Document access
 
-## 🔧 Technical Details
+## Technical Details
 
 - Built with Chrome Extension Manifest V3
 - Uses Chrome Storage Sync API for settings persistence
@@ -86,7 +93,7 @@ The extension comes pre-configured with essential productivity tools:
   - Minimal storage access
   - Smart state management
 
-## 💪 Best Practices
+## Best Practices
 
 - **Window Management**: Always operates from your currently active window
 - **Tab Groups**: Preserves and collapses existing tab groups
@@ -95,11 +102,16 @@ The extension comes pre-configured with essential productivity tools:
 - **Quick Access**: New tab always opens after pinned tabs for easy navigation
 - **Performance**: Optimized for speed with parallel operations and caching
 
-## 🤝 Contributing
+## Supported
+
+- Chrome 114+ (Manifest V3)
+- Chrome tab groups enabled
+
+## Contributing
 
 Feel free to submit issues and enhancement requests!
 
-## 📝 License
+## License
 
 [MIT License](LICENSE)
 
