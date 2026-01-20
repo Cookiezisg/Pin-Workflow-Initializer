@@ -1,6 +1,6 @@
 # Pin Workflow Initializer
 
-[![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-4285F4?logo=googlechrome&logoColor=white)](https://chrome.google.com/webstore/category/extensions)
+[![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/aphlkmbopbcnliomahcjeiiigoepponh?utm_source=item-share-cb)
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-0F9D58)
 ![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-222222)
 ![License](https://img.shields.io/badge/License-MIT-2EA44F)
