@@ -5,10 +5,11 @@ import path from 'node:path';
 
 const EXT = path.resolve('.output/chrome-mv3');
 
-/** Fake web: every http:// host resolves to a local server that titles pages "host/path". */
+/** Fake web: every http:// host resolves to a local server that titles pages "host/path" (or `?title=`). */
 function startFakeWeb(): Promise<Server> {
   const server = createServer((req, res) => {
-    const title = `${req.headers.host}${req.url}`.replace(/[<>&]/g, '');
+    const given = new URL(req.url ?? '/', 'http://x').searchParams.get('title');
+    const title = (given ?? `${req.headers.host}${req.url}`).replace(/[<>&]/g, '');
     res.writeHead(200, { 'content-type': 'text/html' });
     res.end(`<!doctype html><title>${title}</title><h1>${title}</h1>`);
   });
