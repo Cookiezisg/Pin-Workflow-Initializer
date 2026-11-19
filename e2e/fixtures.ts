@@ -1,19 +1,43 @@
 import { chromium, test as base, type BrowserContext, type Page, type Worker } from '@playwright/test';
-import { createServer, type Server } from 'node:http';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { createServer as createHttpsServer } from 'node:https';
+import { tmpdir } from 'node:os';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 
 const EXT = path.resolve('.output/chrome-mv3');
 
+/** Page titles by "host/path?query", for tests that want realistic tabs. */
+export const fakeTitles = new Map<string, string>();
+
 /** Fake web: every http:// host resolves to a local server that titles pages "host/path" (or `?title=`). */
 function startFakeWeb(): Promise<Server> {
-  const server = createServer((req, res) => {
+  const handler = (req: IncomingMessage, res: ServerResponse) => {
     const given = new URL(req.url ?? '/', 'http://x').searchParams.get('title');
-    const title = (given ?? `${req.headers.host}${req.url}`).replace(/[<>&]/g, '');
-    res.writeHead(200, { 'content-type': 'text/html' });
-    res.end(`<!doctype html><title>${title}</title><h1>${title}</h1>`);
-  });
+    const title = (given ?? fakeTitles.get(`${req.headers.host}${req.url}`) ?? `${req.headers.host}${req.url}`).replace(/[<>&]/g, '');
+    if (req.url === '/favicon.svg') {
+      // A coloured letter per host, so screenshots have recognisable favicons.
+      const host = req.headers.host ?? 'x';
+      const hue = [...host].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+      const letter = host.replace(/^www\./, '')[0]!.toUpperCase();
+      res.writeHead(200, { 'content-type': 'image/svg+xml' });
+      res.end(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="hsl(${hue} 65% 48%)"/><text x="16" y="22.5" font-family="Arial,sans-serif" font-weight="700" font-size="18" fill="#fff" text-anchor="middle">${letter}</text></svg>`);
+      return;
+    }
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end(`<!doctype html><link rel="icon" href="/favicon.svg"><title>${title}</title><h1>${title}</h1>`);
+  };
+  // Store screenshots use real-looking hosts, many of which Chrome forces to https (HSTS preload).
+  const server = process.env.STORE_ASSETS ? createHttpsServer(selfSignedCert(), handler) : createServer(handler);
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
+}
+
+function selfSignedCert() {
+  const dir = mkdtempSync(path.join(tmpdir(), 'pwi-cert-'));
+  execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=fake', '-keyout', `${dir}/key.pem`, '-out', `${dir}/cert.pem`], { stdio: 'ignore' });
+  return { key: readFileSync(`${dir}/key.pem`), cert: readFileSync(`${dir}/cert.pem`) };
 }
 
 export const test = base.extend<{ context: BrowserContext; sw: Worker; extId: string; ext: Page }>({
@@ -24,10 +48,13 @@ export const test = base.extend<{ context: BrowserContext; sw: Worker; extId: st
     const context = await chromium.launchPersistentContext('', {
       channel: 'chromium',
       headless: !process.env.HEADED,
+      deviceScaleFactor: process.env.STORE_ASSETS ? 2 : undefined,
+      ignoreHTTPSErrors: !!process.env.STORE_ASSETS,
       args: [
         `--disable-extensions-except=${EXT}`,
         `--load-extension=${EXT}`,
         `--host-resolver-rules=MAP * 127.0.0.1:${port}, EXCLUDE localhost`,
+        ...(process.env.STORE_ASSETS ? ['--ignore-certificate-errors', '--disable-features=CaptivePortalDetection'] : []),
       ],
     });
     await use(context);

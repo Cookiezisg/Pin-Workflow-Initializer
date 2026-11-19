@@ -525,7 +525,8 @@ function TimelineView({ action }: { action: Action }) {
                 </span>
               </div>
               <div class="small faint">
-                {t('{0} tabs', s.tabCount)} · {t('{0} windows', s.windows.length)}
+                {t('{0} tabs', s.tabCount)}
+                {s.windows.length > 1 && ` · ${t('{0} windows', s.windows.length)}`}
                 {s.undone && ` · ${t('undone')}`}
               </div>
               {open === s.id && (
