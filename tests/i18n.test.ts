@@ -29,3 +29,11 @@ describe('i18n', () => {
     }
   });
 });
+
+it('store limits: description ≤ 132 and name ≤ 75 characters in every locale', () => {
+  for (const locale of readdirSync('public/_locales')) {
+    const m = JSON.parse(readFileSync(`public/_locales/${locale}/messages.json`, 'utf8'));
+    expect([...m.extDescription.message].length, locale).toBeLessThanOrEqual(132);
+    expect([...m.extName.message].length, locale).toBeLessThanOrEqual(75);
+  }
+});
