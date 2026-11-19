@@ -1,0 +1,37 @@
+{
+  "extName": {
+    "message": "Pin Workflow Initializer"
+  },
+  "extDescription": {
+    "message": "Chrome 工作区引擎：声明式固定标签页、秒切工作区、可撤销时间线、命令面板、规则与 AI 分组。"
+  },
+  "actionTitle": {
+    "message": "Pin Workflow — 命令面板"
+  },
+  "cmdPalette": {
+    "message": "打开命令面板"
+  },
+  "cmdApply": {
+    "message": "初始化当前工作区"
+  },
+  "cmdUndo": {
+    "message": "撤销上一步操作"
+  },
+  "cmdSidePanel": {
+    "message": "打开侧边栏仪表盘"
+  },
+  "cmdNextWorkspace": {
+    "message": "切换到下一个工作区"
+  },
+  "cmdArchiveUngrouped": {
+    "message": "归档未分组的标签页"
+  },
+  "idleArchived": {
+    "message": "已归档 $COUNT$ 个闲置标签页",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  }
+}

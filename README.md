@@ -2,119 +2,88 @@
 
 [![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/aphlkmbopbcnliomahcjeiiigoepponh?utm_source=item-share-cb)
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-0F9D58)
-![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-222222)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6)
 ![License](https://img.shields.io/badge/License-MIT-2EA44F)
 
-Pin Workflow Initializer is a Chrome extension that instantly organizes your workspace by managing pinned tabs and tab groups across windows with one click or a keyboard shortcut.
+**A workspace engine for Chrome.** Describe the tabs a workspace should have; one keystroke makes the
+browser match it. Switch between complete tab setups in a second, undo anything, and find any tab you
+ever had open.
 
-![Screenshot](screenshot.png)
-  
-## Purpose
+> 中文简介：Chrome 的「工作区引擎」。声明每个工作区应该有哪些固定标签和分组，一键让浏览器收敛到这个状态；在多套工作区之间秒切，每套都记得自己打开过的标签页；每次操作前自动快照，随时撤销；命令面板模糊搜索所有标签页、工作区和归档；支持规则、定时切换、闲置归档和 AI 智能分组。
 
-Built for professionals who:
+## What it does
 
-- Need quick access to multiple essential websites daily
-- Want to maintain a clean and organized browser workspace
-- Prefer a consistent tab layout across browser sessions
-- Work with multiple Chrome windows but want centralized tab management
-- Use Chrome's tab groups feature for better organization
+| | |
+|---|---|
+| **Initialize** `⌥⇧C` | Converges the window to the workspace: pins in exact order, preset groups, clutter archived. Reuses tabs that are already open (logins, drafts and scroll position survive) and is idempotent. Press it ten times and you get the same result as pressing it once. |
+| **Workspaces** | Several named setups (Work, Focus, Research…). Switching saves what's open as the old workspace's session and restores the new one's, lazily: background tabs load only when you look at them. |
+| **Command palette** `⌥⇧K` | Fuzzy search over every open tab in every window, your workspaces, all actions and the archive. `>` actions, `@` workspaces, `#` archive. |
+| **Timeline & undo** `⌥⇧Z` | Every change is snapshotted first. Undo the last action or restore the whole browser (all windows) to any earlier moment. |
+| **Archive** | Nothing gets destroyed: tabs cleaned up, idle tabs and closed windows land in a searchable archive. |
+| **Dry run** | Preview exactly what Initialize would do before it does it. |
+| **Rules** | Per-URL rules: auto-group (`github.com/*/pull/*` → "PRs"), auto-pin, or block. Scope rules to workspaces for focus modes. |
+| **Automation** | Schedules ("Work at 9:00 on weekdays"), idle-tab archiving, duplicate handling, re-pin on start-up, background snapshots. |
+| **AI** (optional) | Smart grouping of loose tabs and a "Where was I?" recap. Runs on Chrome's on-device model, DeepSeek, Claude, or any OpenAI-compatible endpoint (including local Ollama). It previews the result before applying anything, and only sends titles and URLs (query strings are stripped). |
+| **Side panel** `⌥⇧S` | Live dashboard: workspace switcher, window outline, send-tab-to-workspace, archive and timeline. |
 
-## Key Features
+English and 简体中文 UI, light and dark themes. Upgrading from 1.x migrates your pinned sites into a
+"Main" workspace.
 
-- **One-Click Initialization**: Instantly set up your workspace via icon click or keyboard shortcut
-- **Smart Window Management**: Automatically consolidates all tabs into your active window
-- **Tab Groups Preservation**: Maintains your existing tab groups while cleaning up ungrouped tabs
-- **Customizable Workflow**: Fully configurable list of pinned websites
-- **Cross-Device Sync**: Settings sync across all your Chrome instances
-- **Performance Optimized**:
-  - Efficient caching system for frequently accessed settings
-  - Parallel processing of tab operations
-  - Smart tab classification and management
-  - Minimal API calls for better performance
-- **Keyboard First**: Quick access via Alt+Shift+C (customizable)
+## How it works
 
-## Installation
+```
+src/
+  core/        pure, unit-tested logic (no chrome.* here)
+    plan.ts      the reconciler: (live window, target) → ordered ops
+    targets.ts   workspace / session / snapshot → target
+    match.ts     URL matching (scope, glob, /regex/, domain)
+    fuzzy.ts     palette ranking
+    rules.ts, schedule.ts, defaults.ts (+ v1 migration, import sanitising)
+  engine/      side effects
+    engine.ts    apply / switch / undo / restore / archive / merge…, serialised, snapshot-first
+    executor.ts  runs plan ops against a BrowserApi
+    chrome-api.ts, chrome-store.ts (storage.sync + storage.local + IndexedDB)
+  entrypoints/ background, popup (palette), sidepanel, options, suspended (lazy tab), blocked
+  lib/         rpc, ai, i18n
+```
 
-1. Open Chrome Extensions page (`chrome://extensions/`)
-2. Enable "Developer mode" in the top right
-3. Click "Load unpacked" and select the `pin_workflow_initializer` directory
+The core idea is reconciliation, the same pattern as React's diff or Terraform's plan/apply.
+`plan(window, target)` matches existing tabs to the target's specs. The planner reuses every tab
+it can and emits the minimum set of create/pin/move/group/archive ops. Creates always come before
+closes, so a window is never emptied by accident. Because the planner is a pure function, a dry
+run is just `plan()` without `execute()`, and undo is `plan()` toward a snapshot.
 
-## Usage
+## Develop
 
-### Quick Start
+```bash
+npm install
+npm run dev        # Chrome with the extension loaded and hot reload
+npm test           # unit tests (planner, engine against a simulated tab strip, i18n coverage)
+npm run e2e        # builds, then drives the real extension in Chromium via Playwright
+npm run zip        # store-ready zip in .output/
+```
 
-- **Click Method**: Click the extension icon in your toolbar
-- **Keyboard Method**: Press `Alt+Shift+C`
+The unit tests run the engine against `tests/fake-browser.ts`, a simulator that follows Chrome's
+tab-strip rules: pinned tabs stay in front, groups stay contiguous, and closing the last tab closes
+the window. Every scenario also checks that planning a second time produces no ops.
 
-Either method will:
+Load manually: `npm run build`, then `chrome://extensions` → Developer mode → Load unpacked →
+`.output/chrome-mv3`.
 
-1. Preserve and collapse all tab groups in your active window
-2. Close all other Chrome windows
-3. Remove ungrouped tabs in your active window
-4. Reset pinned tabs according to your configuration
-5. Open a fresh new tab
+## Release
 
-### Customize Your Workflow
+Bump `version` in `package.json`, then push a tag `vX.Y.Z`. The release workflow builds and tests,
+attaches the zip to a GitHub release, and submits it to the Chrome Web Store if these repository
+secrets exist: `CHROME_EXTENSION_ID`, `CHROME_CLIENT_ID`, `CHROME_CLIENT_SECRET`,
+`CHROME_REFRESH_TOKEN`.
 
-1. Right-click the extension icon
-2. Select "Options"
-3. In the configuration page, you can:
-   - Add/remove websites
-   - Reorder websites using arrows
-   - Save your configuration
+## Privacy
 
-### Customize Keyboard Shortcut
-
-1. Visit `chrome://extensions/shortcuts`
-2. Find "Pin Workflow Initializer"
-3. Click the input box next to "Initialize Workflow"
-4. Press your desired key combination
-5. The change saves automatically
-
-## Default Configuration
-
-The extension comes pre-configured with essential productivity tools:
-
-- Gmail - Email communication
-- Google Calendar - Schedule management
-- Google Drive - Document access
-
-## Technical Details
-
-- Built with Chrome Extension Manifest V3
-- Uses Chrome Storage Sync API for settings persistence
-- Implements Chrome Commands API for keyboard shortcuts
-- Utilizes Chrome Windows, Tabs, and Tab Groups APIs for window management
-- Zero external dependencies
-- Performance optimizations:
-  - URL caching with automatic invalidation
-  - Parallel tab operations
-  - Efficient tab classification
-  - Minimal storage access
-  - Smart state management
-
-## Best Practices
-
-- **Window Management**: Always operates from your currently active window
-- **Tab Groups**: Preserves and collapses existing tab groups
-- **Tab Order**: Maintains consistent order of pinned tabs as configured
-- **Clean Workspace**: Automatically removes ungrouped tabs to prevent clutter
-- **Quick Access**: New tab always opens after pinned tabs for easy navigation
-- **Performance**: Optimized for speed with parallel operations and caching
-
-## Supported
-
-- Chrome 114+ (Manifest V3)
-- Chrome tab groups enabled
-
-## Contributing
-
-Feel free to submit issues and enhancement requests!
+Everything stays in your browser. Workspaces and settings sync through your Chrome account. Sessions,
+snapshots and the archive stay on the device. API keys are stored locally and never synced or
+exported. The only network calls are AI requests, which you have to switch on yourself, and they go
+to the provider you choose.
 
 ## License
 
-[MIT License](LICENSE)
-
----
-
-Sun, Weilin
+[MIT](LICENSE) © Sun Weilin
