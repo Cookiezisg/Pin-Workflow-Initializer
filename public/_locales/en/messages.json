@@ -1,0 +1,37 @@
+{
+  "extName": {
+    "message": "Pin Workflow Initializer"
+  },
+  "extDescription": {
+    "message": "Workspace engine for Chrome: declarative pinned tabs, instant workspace switching, undo timeline, command palette, rules and AI grouping."
+  },
+  "actionTitle": {
+    "message": "Pin Workflow — command palette"
+  },
+  "cmdPalette": {
+    "message": "Open command palette"
+  },
+  "cmdApply": {
+    "message": "Initialize the current workspace"
+  },
+  "cmdUndo": {
+    "message": "Undo the last action"
+  },
+  "cmdSidePanel": {
+    "message": "Open the dashboard side panel"
+  },
+  "cmdNextWorkspace": {
+    "message": "Switch to the next workspace"
+  },
+  "cmdArchiveUngrouped": {
+    "message": "Archive ungrouped tabs"
+  },
+  "idleArchived": {
+    "message": "$COUNT$ idle tabs archived",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  }
+}

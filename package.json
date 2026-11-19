@@ -1,0 +1,33 @@
+{
+  "name": "pin-workflow-initializer",
+  "description": "Workspace engine for Chrome: declarative pinned tabs, workspaces, snapshots, command palette, rules and AI grouping.",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build",
+    "zip": "wxt zip",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "wxt build && playwright test",
+    "check": "npm run typecheck && npm run test && npm run build",
+    "postinstall": "wxt prepare"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@preact/preset-vite": "^2.10.6",
+    "@types/chrome": "^0.3.7",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7",
+    "wxt": "^0.20.27"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.4.0",
+    "idb": "^8.0.4",
+    "preact": "^10.29.8",
+    "zod": "^4.6.7"
+  }
+}
