@@ -70,7 +70,6 @@ body {
   border-radius: 14px;
   background: var(--bg);
   border: 1px solid var(--line);
-  border-top: 3px solid var(--g);
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
@@ -129,7 +128,6 @@ body {
 .group {
   background: var(--bg);
   border: 1px solid var(--line);
-  border-left: 3px solid var(--g);
   border-radius: 10px;
   padding: 2px 4px 4px;
 }
