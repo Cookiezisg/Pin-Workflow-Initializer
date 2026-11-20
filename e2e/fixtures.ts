@@ -8,6 +8,8 @@ import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 
 const EXT = path.resolve('.output/chrome-mv3');
+/** Demo runs (store assets, gallery) use real-looking https hosts and render at 2×. */
+const DEMO = !!(process.env.STORE_ASSETS || process.env.GALLERY);
 
 /** Page titles by "host/path?query", for tests that want realistic tabs. */
 export const fakeTitles = new Map<string, string>();
@@ -30,7 +32,7 @@ function startFakeWeb(): Promise<Server> {
     res.end(`<!doctype html><link rel="icon" href="/favicon.svg"><title>${title}</title><h1>${title}</h1>`);
   };
   // Store screenshots use real-looking hosts, many of which Chrome forces to https (HSTS preload).
-  const server = process.env.STORE_ASSETS ? createHttpsServer(selfSignedCert(), handler) : createServer(handler);
+  const server = DEMO ? createHttpsServer(selfSignedCert(), handler) : createServer(handler);
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
 }
 
@@ -48,13 +50,13 @@ export const test = base.extend<{ context: BrowserContext; sw: Worker; extId: st
     const context = await chromium.launchPersistentContext('', {
       channel: 'chromium',
       headless: !process.env.HEADED,
-      deviceScaleFactor: process.env.STORE_ASSETS ? 2 : undefined,
-      ignoreHTTPSErrors: !!process.env.STORE_ASSETS,
+      deviceScaleFactor: DEMO ? 2 : undefined,
+      ignoreHTTPSErrors: DEMO,
       args: [
         `--disable-extensions-except=${EXT}`,
         `--load-extension=${EXT}`,
         `--host-resolver-rules=MAP * 127.0.0.1:${port}, EXCLUDE localhost`,
-        ...(process.env.STORE_ASSETS ? ['--ignore-certificate-errors', '--disable-features=CaptivePortalDetection'] : []),
+        ...(DEMO ? ['--ignore-certificate-errors', '--disable-features=CaptivePortalDetection'] : []),
       ],
     });
     await use(context);
