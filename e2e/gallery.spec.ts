@@ -88,14 +88,23 @@ test('gallery', async ({ context, extId, ext }) => {
   // Show the AI page with a provider chosen.
   await ext.evaluate(async () => {
     const s = (await chrome.storage.sync.get('settings')).settings as { ai: Record<string, unknown> };
-    await chrome.storage.sync.set({ settings: { ...s, ai: { ...s.ai, provider: 'deepseek' } } });
+    const index = (await chrome.storage.sync.get('ws:index'))['ws:index'] as string[];
+    const settings = s as unknown as Record<string, any>;
+    await chrome.storage.sync.set({
+      settings: {
+        ...settings,
+        ai: { ...s.ai, provider: 'deepseek' },
+        schedules: settings.schedules.length ? settings.schedules : [{ id: 'sc1', enabled: true, workspaceId: index[0], days: [1, 2, 3, 4, 5], time: '09:00' }],
+        rules: [...settings.rules, { id: 'r-group', enabled: true, kind: 'glob', pattern: '*://github.com/*/pull/*', action: { type: 'group', title: 'Pull requests', color: 'green' }, workspaceIds: [] }],
+      },
+    });
   });
   for (const dark of [false, true]) {
     const mode = dark ? 'Dark' : 'Light';
     const p = await context.newPage();
     await themed(p, dark);
     await p.setViewportSize({ width: 1100, height: 760 });
-    for (const [hash, name] of dark ? pages.slice(0, 2) : pages) {
+    for (const [hash, name] of dark ? pages.slice(0, 3) : pages) {
       await p.goto(`${base}/options.html#${hash}`);
       await p.waitForTimeout(500);
       await snap(p, `settings-${hash.split('/')[0]}${hash.includes('/') ? '-edit' : ''}-${mode}`, `${mode} · ${name}`, true);

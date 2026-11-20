@@ -31,6 +31,22 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
   return <button type="button" role="switch" class="toggle" aria-checked={checked} aria-label={label} onClick={() => onChange(!checked)} />;
 }
 
+/** Makes a non-button element (a list row) behave like a button for keyboard users: Tab reaches it, Enter/Space press it. */
+export function pressable(onPress: () => void) {
+  return {
+    role: 'button',
+    tabIndex: 0,
+    onClick: onPress,
+    onKeyDown: (e: KeyboardEvent) => {
+      if (e.target !== e.currentTarget) return;
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onPress();
+      }
+    },
+  } as const;
+}
+
 export function Kbd({ children }: { children: ComponentChildren }) {
   return <span class="kbd">{children}</span>;
 }
@@ -256,24 +272,51 @@ export function Menu({ trigger, items, align = 'right', label }: {
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [up, setUp] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const trig = () => ref.current?.firstElementChild as HTMLElement | null;
+  // The trigger announces the menu, as Chrome's ⋮ buttons do.
   useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    trig()?.setAttribute('aria-haspopup', 'menu');
+    trig()?.setAttribute('aria-expanded', String(open));
+  });
+  useEffect(() => {
+    if (!open) return setUp(false);
+    const items = () => [...(ref.current?.querySelectorAll<HTMLButtonElement>('.menu button:not(:disabled)') ?? [])];
+    const close = (refocus: boolean) => {
+      setOpen(false);
+      if (refocus) trig()?.focus();
+    };
+    const onDown = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && close(false);
+    // Keyboard model of a menu: arrows move, Home/End jump, Esc closes and returns focus, Tab leaves.
+    const onKey = (e: KeyboardEvent) => {
+      const list = items();
+      const i = list.indexOf(document.activeElement as HTMLButtonElement);
+      const go = (n: number) => (e.preventDefault(), list[(n + list.length) % list.length]?.focus());
+      if (e.key === 'Escape') (e.preventDefault(), e.stopPropagation(), close(true));
+      else if (e.key === 'Tab') close(false);
+      else if (e.key === 'ArrowDown') go(i + 1);
+      else if (e.key === 'ArrowUp') go(i < 0 ? -1 : i - 1);
+      else if (e.key === 'Home') go(0);
+      else if (e.key === 'End') go(-1);
+    };
     document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    ref.current?.querySelector<HTMLButtonElement>('.menu button')?.focus();
+    document.addEventListener('keydown', onKey, true);
+    // Open upwards when there is no room below.
+    const menu = ref.current?.querySelector<HTMLElement>('.menu');
+    const anchor = ref.current?.getBoundingClientRect();
+    if (menu && anchor && anchor.bottom + menu.offsetHeight + 8 > innerHeight && anchor.top > innerHeight - anchor.bottom) setUp(true);
+    items()[0]?.focus();
     return () => {
       document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('keydown', onKey, true);
     };
   }, [open]);
   return (
     <div class="menu-anchor" ref={ref}>
       {trigger(() => setOpen((o) => !o), open)}
       {open && (
-        <div class="menu" role="menu" aria-label={label} style={align === 'right' ? { right: 0 } : { left: 0 }}>
+        <div class={up ? 'menu up' : 'menu'} role="menu" aria-label={label} style={align === 'right' ? { right: 0 } : { left: 0 }}>
           {items.map((it, i) =>
             it === 'divider' ? (
               <div key={i} class="menu-divider" />
@@ -285,8 +328,10 @@ export function Menu({ trigger, items, align = 'right', label }: {
                 role="menuitem"
                 class={it.danger ? 'danger' : ''}
                 disabled={it.disabled}
+                tabIndex={-1}
                 onClick={() => {
                   setOpen(false);
+                  trig()?.focus();
                   it.onSelect();
                 }}
               >

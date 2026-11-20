@@ -34,24 +34,36 @@ function useHash(): [string, (h: string) => void] {
   return [hash, (h) => (location.hash = h)];
 }
 
-/** Debounced persistence with a "Saved" indicator. */
+/** Debounced persistence. Pending saves are flushed when the page is hidden or closed, so no change is ever lost. */
 function useSaver() {
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const timers = useRef(new Map<string, number>());
+  const pending = useRef(new Map<string, { timer: number; run: () => Promise<void> }>());
+  const run = async (key: string) => {
+    const p = pending.current.get(key);
+    if (!p) return;
+    window.clearTimeout(p.timer);
+    pending.current.delete(key);
+    try {
+      await p.run();
+      setState('saved');
+    } catch {
+      setState('error');
+    }
+  };
+  useEffect(() => {
+    const flush = () => [...pending.current.keys()].forEach((k) => void run(k));
+    const onHidden = () => document.visibilityState === 'hidden' && flush();
+    addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onHidden);
+    return () => {
+      removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onHidden);
+    };
+  }, []);
   const save = (key: string, fn: () => Promise<void>, delay = 350) => {
-    window.clearTimeout(timers.current.get(key));
+    window.clearTimeout(pending.current.get(key)?.timer);
     setState('saving');
-    timers.current.set(
-      key,
-      window.setTimeout(async () => {
-        try {
-          await fn();
-          setState('saved');
-        } catch {
-          setState('error');
-        }
-      }, delay),
-    );
+    pending.current.set(key, { run: fn, timer: window.setTimeout(() => void run(key), delay) });
   };
   return { state, save };
 }
@@ -123,14 +135,24 @@ function Card({ title, children }: { title?: string; children: ComponentChildren
   );
 }
 
+let fieldSeq = 0;
+
+/** A settings row. Its label names every unlabeled field inside the control area. */
 function Field({ label, hint, children }: { label: string; hint?: string; children: ComponentChildren }) {
+  const id = useMemo(() => `field-${++fieldSeq}`, []);
+  const control = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    for (const el of control.current?.querySelectorAll('input:not([type=hidden]), select, textarea') ?? []) {
+      if (!el.hasAttribute('aria-label') && !el.hasAttribute('aria-labelledby')) el.setAttribute('aria-labelledby', id);
+    }
+  });
   return (
     <div class="setting-row">
       <div class="grow">
-        <div>{label}</div>
+        <div id={id}>{label}</div>
         {hint && <div class="small muted">{hint}</div>}
       </div>
-      <div class="control">{children}</div>
+      <div class="control" ref={control}>{children}</div>
     </div>
   );
 }
@@ -141,6 +163,15 @@ function SwitchField({ label, hint, value, onChange }: { label: string; hint?: s
       <Toggle checked={value} onChange={onChange} label={label} />
     </Field>
   );
+}
+
+/** A number field's value once the user has finished typing (change fires on blur or Enter), clamped and shown back. */
+function committed(e: Event, min: number, max: number, fallback: number): number {
+  const el = e.target as HTMLInputElement;
+  const raw = el.value.trim() === '' ? fallback : Number(el.value);
+  const v = Math.min(max, Math.max(min, Number.isFinite(raw) ? Math.round(raw) : fallback));
+  el.value = String(v);
+  return v;
 }
 
 function urlValid(u: string): boolean {
@@ -392,7 +423,7 @@ function PinRow(props: {
     <div class="setting-row col-row">
       <div class="row">
         {valid ? <Favicon url={props.url} /> : <span class="favicon" />}
-        <input class={`input mono grow ${valid ? '' : 'invalid'}`} value={props.url} placeholder="https://" onInput={(e) => props.onChange({ url: (e.target as HTMLInputElement).value.trim() })} />
+        <input class={`input mono grow ${valid ? '' : 'invalid'}`} value={props.url} placeholder="https://" aria-label={t('URL')} onInput={(e) => props.onChange({ url: (e.target as HTMLInputElement).value.trim() })} />
         <Menu
           label={t('More actions')}
           trigger={(open) => (
@@ -414,6 +445,7 @@ function PinRow(props: {
             class={`input mono grow ${matchValid ? '' : 'invalid'}`}
             value={props.match ?? ''}
             placeholder={t('e.g. *://mail.google.com/*  or  /regex/')}
+            aria-label={t('Custom matching')}
             onInput={(e) => props.onChange({ match: (e.target as HTMLInputElement).value || undefined })}
           />
         </div>
@@ -437,6 +469,7 @@ function GroupEditor({ group, onChange, onRemove }: { group: GroupSpec; onChange
           <input
             class={`input mono grow ${urlValid(tb.url) ? '' : 'invalid'}`}
             value={tb.url}
+            aria-label={t('URL')}
             onInput={(e) => onChange({ tabs: group.tabs.map((x, j) => (j === i ? { ...x, url: (e.target as HTMLInputElement).value.trim() } : x)) })}
           />
           <button class="btn icon sm" title={t('Remove')} onClick={() => onChange({ tabs: group.tabs.filter((_, j) => j !== i) })}>
@@ -445,7 +478,7 @@ function GroupEditor({ group, onChange, onRemove }: { group: GroupSpec; onChange
         </div>
       ))}
       <div class="row">
-        <button class="btn ghost sm" onClick={() => onChange({ tabs: [...group.tabs, { url: 'https://' }] })}>
+        <button class="btn" onClick={() => onChange({ tabs: [...group.tabs, { url: 'https://' }] })}>
           {t('Add tab')}
         </button>
         <span class="grow" />
@@ -525,7 +558,7 @@ function RuleRow({ n, rule, workspaces, highlight, onChange, onRemove }: {
     <div class={`setting-row col-row rule ${highlight ? 'hit' : ''} ${rule.enabled ? '' : 'disabled'}`}>
       <div class="row">
         <span class="muted rule-n">{n}</span>
-        <select class="select" value={rule.kind} onChange={(e) => onChange({ kind: (e.target as HTMLSelectElement).value as Rule['kind'] })}>
+        <select class="select rule-select" value={rule.kind} aria-label={t('Rule type')} onChange={(e) => onChange({ kind: (e.target as HTMLSelectElement).value as Rule['kind'] })}>
           <option value="domain">{t('Domain')}</option>
           <option value="glob">{t('URL pattern')}</option>
           <option value="regex">{t('Regex')}</option>
@@ -533,6 +566,7 @@ function RuleRow({ n, rule, workspaces, highlight, onChange, onRemove }: {
         <input
           class={`input mono grow ${valid ? '' : 'invalid'}`}
           value={rule.pattern}
+          aria-label={t('Pattern')}
           placeholder={rule.kind === 'domain' ? 'github.com' : rule.kind === 'glob' ? '*://github.com/*/pull/*' : '^https://(www\\.)?youtube\\.com/'}
           onInput={(e) => onChange({ pattern: (e.target as HTMLInputElement).value })}
         />
@@ -542,7 +576,7 @@ function RuleRow({ n, rule, workspaces, highlight, onChange, onRemove }: {
         </button>
       </div>
       <div class="row wrap indent">
-        <select class="select" value={rule.action.type} onChange={(e) => setAction((e.target as HTMLSelectElement).value as RuleAction['type'])}>
+        <select class="select rule-select" value={rule.action.type} aria-label={t('Action')} onChange={(e) => setAction((e.target as HTMLSelectElement).value as RuleAction['type'])}>
           <option value="group">{t('Put in group')}</option>
           <option value="pin">{t('Pin it')}</option>
           <option value="block">{t('Block it')}</option>
@@ -552,6 +586,7 @@ function RuleRow({ n, rule, workspaces, highlight, onChange, onRemove }: {
             <input
               class="input"
               value={rule.action.title}
+              aria-label={t('Group title')}
               onInput={(e) => onChange({ action: { ...(rule.action as Extract<RuleAction, { type: 'group' }>), title: (e.target as HTMLInputElement).value } })}
             />
             <ColorPicker value={rule.action.color} onChange={(color) => onChange({ action: { ...(rule.action as Extract<RuleAction, { type: 'group' }>), color } })} />
@@ -598,14 +633,14 @@ function AutomationSection({ data, saver }: { data: AppData; saver: Saver }) {
           return (
             <div key={sc.id} class="setting-row col-row">
               <div class="row">
-                <select class="select" value={sc.workspaceId} onChange={(e) => patch({ workspaceId: (e.target as HTMLSelectElement).value })}>
+                <select class="select" value={sc.workspaceId} aria-label={t('Workspace')} onChange={(e) => patch({ workspaceId: (e.target as HTMLSelectElement).value })}>
                   {data.workspaces.map((w) => (
                     <option key={w.id} value={w.id}>
                       {w.name}
                     </option>
                   ))}
                 </select>
-                <input type="time" class="input" value={sc.time} onInput={(e) => patch({ time: (e.target as HTMLInputElement).value || '09:00' })} />
+                <input type="time" class="input" value={sc.time} aria-label={t('Time')} onInput={(e) => patch({ time: (e.target as HTMLInputElement).value || '09:00' })} />
                 <span class="small muted grow">{next ? t('next: {0}', next.toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })) : t('never')}</span>
                 <Toggle checked={sc.enabled} onChange={(enabled) => patch({ enabled })} label={t('Enabled')} />
                 <button class="btn icon sm" title={t('Remove')} onClick={() => setSchedules(s.schedules.filter((x) => x.id !== sc.id))}>
@@ -635,7 +670,7 @@ function AutomationSection({ data, saver }: { data: AppData; saver: Saver }) {
       <Card title={t('Tidying')}>
         <Field label={t('Archive idle tabs after')} hint={t('Unpinned tabs you haven’t looked at. 0 = off.')}>
           <div class="row">
-            <input type="number" min={0} step={30} class="input num" value={s.idleArchiveMinutes} onInput={(e) => update({ idleArchiveMinutes: Math.max(0, Number((e.target as HTMLInputElement).value) || 0) })} />
+            <input type="number" min={0} step={30} class="input num" value={s.idleArchiveMinutes} onChange={(e) => update({ idleArchiveMinutes: committed(e, 0, Infinity, 0) })} />
             <span class="muted">{t('minutes')}</span>
           </div>
         </Field>
@@ -649,15 +684,15 @@ function AutomationSection({ data, saver }: { data: AppData; saver: Saver }) {
         <SwitchField label={t('Re-pin on browser start')} value={s.pinsOnStartup} onChange={(v) => update({ pinsOnStartup: v })} />
         <Field label={t('Background snapshot every')} hint={t('Only when something changed. 0 = off.')}>
           <div class="row">
-            <input type="number" min={0} class="input num" value={s.autoSnapshotMinutes} onInput={(e) => update({ autoSnapshotMinutes: Math.max(0, Number((e.target as HTMLInputElement).value) || 0) })} />
+            <input type="number" min={0} class="input num" value={s.autoSnapshotMinutes} onChange={(e) => update({ autoSnapshotMinutes: committed(e, 0, Infinity, 0) })} />
             <span class="muted">{t('minutes')}</span>
           </div>
         </Field>
         <Field label={t('Keep snapshots')}>
-          <input type="number" min={5} max={1000} class="input num" value={s.snapshotLimit} onInput={(e) => update({ snapshotLimit: Math.min(1000, Math.max(5, Number((e.target as HTMLInputElement).value) || 100)) })} />
+          <input type="number" min={5} max={1000} class="input num" value={s.snapshotLimit} onChange={(e) => update({ snapshotLimit: committed(e, 5, 1000, 100) })} />
         </Field>
         <Field label={t('Keep archived tabs')}>
-          <input type="number" min={50} max={50000} step={500} class="input num" value={s.archiveLimit} onInput={(e) => update({ archiveLimit: Math.min(50000, Math.max(50, Number((e.target as HTMLInputElement).value) || 5000)) })} />
+          <input type="number" min={50} max={50000} step={500} class="input num" value={s.archiveLimit} onChange={(e) => update({ archiveLimit: committed(e, 50, 50000, 5000) })} />
         </Field>
         <SwitchField label={t('Notifications')} hint={t('For scheduled switches and idle archiving')} value={s.notifications} onChange={(v) => update({ notifications: v })} />
       </Card>

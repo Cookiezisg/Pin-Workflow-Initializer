@@ -7,7 +7,7 @@
   --surface-3: #e9eef6;
   --text: #1f1f1f;
   --text-2: #474747;
-  --text-3: #747775;
+  --text-3: #666967;
   --divider: #e1e3e1;
   --primary: #0b57d0;
   --on-primary: #ffffff;
@@ -17,12 +17,13 @@
   --pressed: rgb(31 31 31 / 10%);
   --danger: #b3261e;
   --scrim-shadow: 0 1px 3px rgb(0 0 0 / 15%), 0 4px 8px 3px rgb(0 0 0 / 10%);
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960' fill='%23474747'%3E%3Cpath d='M480-360 280-559h400L480-360Z'/%3E%3C/svg%3E");
   /* Chrome tab group colours */
   --g-grey: #5f6368;
   --g-blue: #1a73e8;
   --g-red: #d93025;
   --g-yellow: #f9ab00;
-  --g-green: #1e8e3e;
+  --g-green: #188038;
   --g-pink: #d01884;
   --g-purple: #a142f4;
   --g-cyan: #007b83;
@@ -38,7 +39,7 @@
     --surface-3: #333537;
     --text: #e3e3e3;
     --text-2: #c4c7c5;
-    --text-3: #8e918f;
+    --text-3: #9aa0a6;
     --divider: #444746;
     --primary: #a8c7fa;
     --on-primary: #062e6f;
@@ -48,6 +49,7 @@
     --pressed: rgb(227 227 227 / 12%);
     --danger: #f2b8b5;
     --scrim-shadow: 0 1px 3px rgb(0 0 0 / 30%), 0 4px 8px 3px rgb(0 0 0 / 15%);
+    --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960' fill='%23C4C7C5'%3E%3Cpath d='M480-360 280-559h400L480-360Z'/%3E%3C/svg%3E");
     --g-grey: #bdc1c6;
     --g-blue: #8ab4f8;
     --g-red: #f28b82;
@@ -67,7 +69,7 @@
   --surface-3: #333537;
   --text: #e3e3e3;
   --text-2: #c4c7c5;
-  --text-3: #8e918f;
+  --text-3: #9aa0a6;
   --divider: #444746;
   --primary: #a8c7fa;
   --on-primary: #062e6f;
@@ -77,6 +79,7 @@
   --pressed: rgb(227 227 227 / 12%);
   --danger: #f2b8b5;
   --scrim-shadow: 0 1px 3px rgb(0 0 0 / 30%), 0 4px 8px 3px rgb(0 0 0 / 15%);
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960' fill='%23C4C7C5'%3E%3Cpath d='M480-360 280-559h400L480-360Z'/%3E%3C/svg%3E");
   --g-grey: #bdc1c6;
   --g-blue: #8ab4f8;
   --g-red: #f28b82;
@@ -150,10 +153,12 @@ a:hover {
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
+  text-decoration: none;
   transition: background-color 0.15s;
 }
 .btn:hover {
   background: var(--hover);
+  text-decoration: none;
 }
 .btn:active {
   background: var(--pressed);
@@ -239,7 +244,11 @@ a:hover {
   font-size: 12px;
 }
 .select {
-  padding-right: 8px;
+  /* Chrome settings style: custom arrow with even padding, never the native one */
+  appearance: none;
+  padding-right: 36px;
+  background: var(--surface) var(--select-arrow) no-repeat right 8px center / 20px 20px;
+  cursor: pointer;
 }
 input[type='checkbox'] {
   accent-color: var(--primary);
@@ -248,40 +257,58 @@ input[type='checkbox'] {
   margin: 0;
 }
 
-/* ---------- toggle: Material 3 switch, as in chrome://settings */
+/* ---------- toggle: Material 3 switch, as in chrome://settings.
+   The button is a 40×24 hit target; the visible 36×20 track is drawn by ::before. */
 .toggle {
   position: relative;
-  width: 36px;
-  height: 20px;
+  width: 40px;
+  height: 24px;
   flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  cursor: pointer;
+}
+.toggle::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  box-sizing: border-box;
   border-radius: 999px;
   background: var(--surface-3);
   border: 2px solid var(--text-3);
-  cursor: pointer;
-  padding: 0;
   transition: background-color 0.15s, border-color 0.15s;
 }
 .toggle::after {
   content: '';
   position: absolute;
-  top: 3px;
-  left: 3px;
+  top: 7px;
+  left: 7px;
   width: 10px;
   height: 10px;
   border-radius: 50%;
   background: var(--text-3);
-  transition: transform 0.15s, width 0.15s, height 0.15s, top 0.15s, background-color 0.15s;
+  transition: transform 0.15s, width 0.15s, height 0.15s, top 0.15s, left 0.15s, background-color 0.15s;
 }
-.toggle[aria-checked='true'] {
+.toggle[aria-checked='true']::before {
   background: var(--primary);
   border-color: var(--primary);
 }
 .toggle[aria-checked='true']::after {
-  top: 1px;
+  top: 5px;
+  left: 5px;
   width: 14px;
   height: 14px;
   background: var(--on-primary);
-  transform: translateX(15px);
+  transform: translateX(16px);
+}
+.toggle:hover::after {
+  box-shadow: 0 0 0 8px var(--hover);
+}
+.toggle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 0;
 }
 
 .kbd {
@@ -383,6 +410,9 @@ mark {
   cursor: pointer;
   padding: 0;
 }
+.swatch:hover:not([aria-pressed='true']) {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--divider);
+}
 .swatch[aria-pressed='true'] {
   box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--g);
 }
@@ -419,12 +449,36 @@ mark {
 .list-row:hover {
   background: var(--hover);
 }
+/* The text of a clickable row is a real button, so the keyboard reaches it; it looks like plain text. */
+.row-main {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: inherit;
+}
+.row-main > * {
+  display: block;
+}
+.row-main:focus-visible {
+  outline: none;
+}
+.list-row:has(> .row-main:focus-visible) {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+/* Row actions take no space until the row is hovered, so titles use the full width (as in Chrome's Reading list). */
 .list-row .hover-only {
-  visibility: hidden;
+  display: none;
 }
 .list-row:hover .hover-only,
-.list-row:focus-within .hover-only {
-  visibility: visible;
+.list-row:focus-within .hover-only,
+.list-row:has(.menu) .hover-only {
+  display: flex;
 }
 
 /* ---------- menu (floating) */
@@ -506,12 +560,12 @@ mark {
 .g-grey { --g: var(--g-grey); }
 .g-blue { --g: var(--g-blue); }
 .g-red { --g: var(--g-red); }
-.g-yellow { --g: var(--g-yellow); }
+.g-yellow { --g: var(--g-yellow); --g-on: #1f1f1f; }
 .g-green { --g: var(--g-green); }
 .g-pink { --g: var(--g-pink); }
 .g-purple { --g: var(--g-purple); }
 .g-cyan { --g: var(--g-cyan); }
-.g-orange { --g: var(--g-orange); }
+.g-orange { --g: var(--g-orange); --g-on: #1f1f1f; }
 .bg-g {
   background: var(--g);
 }
@@ -540,6 +594,14 @@ mark {
   cursor: default;
   background: none;
 }
+.menu button:focus-visible {
+  outline: none;
+  background: var(--hover);
+}
+.menu.up {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
 .menu-divider {
   height: 1px;
   margin: 8px 0;
@@ -554,7 +616,7 @@ mark {
   padding: 0 8px;
   border-radius: 6px;
   background: var(--g);
-  color: var(--surface);
+  color: var(--g-on, var(--surface));
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;

@@ -1,5 +1,11 @@
 // Chinese UI strings. Keys are the English source strings passed to t().
 export const zh: Record<string, string> = {
+  "Results": "结果",
+  "Time": "时间",
+  "Action": "动作",
+  "Pattern": "匹配内容",
+  "Rule type": "规则类型",
+  "URL": "网址",
   "AI": "AI",
   "AI found nothing worth grouping": "AI 没找到值得分组的标签页",
   "AI grouping": "AI 分组",

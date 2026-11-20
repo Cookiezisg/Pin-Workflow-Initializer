@@ -11,7 +11,7 @@ import { suggestGroups, summarize, type SuggestedGroup, type WorkspaceSummary } 
 import { t } from '../../lib/i18n';
 import { call } from '../../lib/rpc';
 import {
-  displayHost, Favicon, Highlight, Icon, Menu, summaryText, timeAgo, useAction, useAppData, useCurrentWindow, useToast, type AppData,
+  displayHost, Favicon, Highlight, Icon, Menu, pressable, summaryText, timeAgo, useAction, useAppData, useCurrentWindow, useToast, type AppData,
   type ShowToast,
 } from '../../ui/kit';
 import './panel.css';
@@ -30,9 +30,21 @@ function App() {
   return (
     <div class="panel">
       <Header data={data} action={action} />
-      <nav class="tabs" role="tablist">
+      <nav
+        class="tabs"
+        role="tablist"
+        onKeyDown={(e) => {
+          // Tabs follow the ARIA pattern: one Tab stop, arrows move between them.
+          const order: View[] = ['now', 'archive', 'timeline'];
+          const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+          if (!step) return;
+          const next = order[(order.indexOf(view) + step + order.length) % order.length]!;
+          setView(next);
+          (e.currentTarget.children[order.indexOf(next)] as HTMLElement).focus();
+        }}
+      >
         {(['now', 'archive', 'timeline'] as View[]).map((v) => (
-          <button key={v} role="tab" aria-selected={view === v} class="tab" onClick={() => setView(v)}>
+          <button key={v} role="tab" aria-selected={view === v} tabIndex={view === v ? 0 : -1} class="tab" onClick={() => setView(v)}>
             {{ now: t('Window'), archive: t('Archive'), timeline: t('Timeline') }[v]}
           </button>
         ))}
@@ -222,7 +234,7 @@ function NowView({ data, win, action, toast }: { data: AppData; win: LiveWindow 
 
       {groups.map(({ g, tabs }) => (
         <section key={g.id}>
-          <div class={`list-row group-head g-${g.color}`} onClick={() => void chrome.tabGroups.update(g.id, { collapsed: !g.collapsed })}>
+          <div class={`list-row group-head g-${g.color}`} aria-expanded={!g.collapsed} {...pressable(() => void chrome.tabGroups.update(g.id, { collapsed: !g.collapsed }))}>
             <span class={g.title ? 'chip' : 'chip empty-title'}>{g.title}</span>
             <span class="faint small grow">{tabs.length}</span>
             <Icon name={g.collapsed ? 'chevron' : 'chevronDown'} class="faint" />
@@ -267,9 +279,10 @@ function NowView({ data, win, action, toast }: { data: AppData; win: LiveWindow 
 function TabRow({ tab, data, action }: { tab: LiveTab; data: AppData; action: Action }) {
   const others = data.workspaces.filter((w) => w.id !== data.active?.id);
   return (
-    <div class="list-row tabrow" aria-current={tab.active} onClick={() => void chrome.tabs.update(tab.id, { active: true })} title={tab.url}>
+    <div class="list-row tabrow" aria-current={tab.active} title={tab.url} onClick={() => void chrome.tabs.update(tab.id, { active: true })}>
       <Favicon url={tab.url} />
-      <span class="grow ellipsis">{tab.title || displayHost(tab.url)}</span>
+      {/* The whole row is clickable; keyboard users press this button (its click bubbles to the row). */}
+      <button type="button" class="row-main grow ellipsis">{tab.title || displayHost(tab.url)}</button>
       <span class="row-actions hover-only" onClick={(e) => e.stopPropagation()}>
         {others.length > 0 && (
           <Menu
@@ -463,18 +476,18 @@ function ArchiveView({ action }: { action: Action }) {
         return (
           <>
             {header && <div class="label">{new Date(a.archivedAt).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</div>}
-            <div key={a.id} class="list-row two-line" onClick={() => (selected.size ? toggle(a.id) : restore([a.id]))} title={t('Restore')}>
+            <div key={a.id} class="list-row two-line" title={t('Restore')} onClick={() => (selected.size ? toggle(a.id) : restore([a.id]))}>
               <span class="lead">
                 <Favicon url={a.url} />
                 <input type="checkbox" checked={selected.has(a.id)} onClick={(e) => (e.stopPropagation(), toggle(a.id))} />
               </span>
-              <span class="grow">
-                <div class="ellipsis"><Highlight text={a.title} indices={hits.title} /></div>
-                <div class="ellipsis small faint">
+              <button type="button" class="row-main grow">
+                <span class="ellipsis"><Highlight text={a.title} indices={hits.title} /></span>
+                <span class="ellipsis small faint">
                   {displayHost(a.url)} · {timeAgo(a.archivedAt)}
                   {a.groupTitle && ` · ${a.groupTitle}`}
-                </div>
-              </span>
+                </span>
+              </button>
               <span class="row-actions hover-only" onClick={(e) => e.stopPropagation()}>
                 <button class="btn icon sm" title={t('Delete')} onClick={() => remove([a.id])}>
                   <Icon name="trash" />
@@ -535,7 +548,11 @@ function TimelineView({ action }: { action: Action }) {
         const isOpen = open === s.id;
         return (
           <div key={s.id} class={s.undone ? 'snap undone' : 'snap'}>
-            <div class="list-row two-line" onClick={() => setOpen(isOpen ? null : s.id)} aria-expanded={isOpen}>
+            <div
+              class="list-row two-line"
+              aria-expanded={isOpen}
+              {...pressable(() => setOpen(isOpen ? null : s.id))}
+            >
               <span class="grow">
                 <div class="ellipsis">{s.label ?? ws?.name ?? t(REASON_LABEL[s.reason])}</div>
                 <div class="ellipsis small faint" title={new Date(s.createdAt).toLocaleString()}>

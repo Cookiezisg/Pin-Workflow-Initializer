@@ -236,7 +236,7 @@ function Palette() {
         />
         {busy && <span class="spinner" />}
       </div>
-      <div class="list" ref={listRef} role="listbox">
+      <div class="list" ref={listRef} role="listbox" aria-label={t('Results')} tabIndex={0}>
         {results.length === 0 && <div class="empty">{t('No matches')}</div>}
         {results.map((r, i) => {
           const header = r.item.kind !== lastKind;

@@ -9,7 +9,7 @@ import path from 'node:path';
 
 const EXT = path.resolve('.output/chrome-mv3');
 /** Demo runs (store assets, gallery) use real-looking https hosts and render at 2×. */
-const DEMO = !!(process.env.STORE_ASSETS || process.env.GALLERY);
+const DEMO = !!(process.env.STORE_ASSETS || process.env.GALLERY || process.env.AUDIT);
 
 /** Page titles by "host/path?query", for tests that want realistic tabs. */
 export const fakeTitles = new Map<string, string>();

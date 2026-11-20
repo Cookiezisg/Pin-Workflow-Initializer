@@ -72,6 +72,16 @@ No emoji anywhere in UI chrome. No sparkle icon for AI.
   Focus ring: 2px `--primary`, offset 2px, only for keyboard focus (`:focus-visible`).
 - **No explanations in the UI.** No "Tip:" lines, no paragraphs under buttons. If a control needs one, change the control.
   Settings rows may have one short secondary line, like `chrome://settings`.
+- **Everything the mouse can do, the keyboard can do.** A clickable row carries a `.row-main` button for focus;
+  focusing a row reveals its actions. Menus: Enter opens, ↑/↓/Home/End move, Esc closes and returns focus to the
+  trigger, Tab leaves. Tab strips: one Tab stop, ←/→ switch. Menus open upwards when there is no room below.
+- **Every control answers the pointer.** Hover changes its background (or adds a ring / state layer); disabled
+  controls never show the pointer cursor.
+- **Settings save themselves** (debounced, flushed when the page is hidden, so closing the tab never loses a change).
+  Number fields validate when you leave them, never while you type.
+- **Checked by machine.** `npm run audit:ui` runs `e2e/audit.spec.ts` (layout, contrast, labels, hit targets) and
+  `e2e/interaction.spec.ts` (keyboard reach, focus rings, hover, menus, tabs, palette, number fields, autosave)
+  on every screen; CI fails on any finding.
 - **Calm motion.** 150ms fades and expands. Nothing bounces, slides in from far away or pulses.
 - **Empty states**: one short line in `--text-3`, centred. No illustrations.
 

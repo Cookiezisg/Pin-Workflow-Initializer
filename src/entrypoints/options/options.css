@@ -232,6 +232,10 @@ h1 {
   text-align: right;
   flex: none;
 }
+.rule-select {
+  width: 160px;
+  flex: none;
+}
 .rule.hit {
   background: var(--primary-container);
 }
