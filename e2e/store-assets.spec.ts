@@ -90,7 +90,11 @@ async function setup(ext: Page) {
   await rpc(ext, 'snapshot', { label: 'Before the launch review' });
 }
 
-const shot = async (page: Page) => `data:image/png;base64,${(await page.screenshot()).toString('base64')}`;
+const shot = async (page: Page) => {
+  await page.mouse.move(0, 0);
+  await page.waitForTimeout(200);
+  return `data:image/png;base64,${(await page.screenshot()).toString('base64')}`;
+};
 const icon = `data:image/svg+xml;base64,${Buffer.from(readFileSync('assets/icon.svg')).toString('base64')}`;
 
 const FRAME_CSS = `
@@ -130,7 +134,7 @@ test('store assets', async ({ context, extId, ext }) => {
 
   // 1. Palette
   const palette = await context.newPage();
-  await palette.setViewportSize({ width: 620, height: 470 });
+  await palette.setViewportSize({ width: 560, height: 460 });
   await palette.goto(`${base}/popup.html`);
   await palette.locator('.q').fill('pull');
   await palette.waitForTimeout(600);
@@ -172,7 +176,7 @@ test('store assets', async ({ context, extId, ext }) => {
   await options.close();
 
   const canvas = await context.newPage();
-  await frame(canvas, '1-palette', 'Find any tab in <em>one keystroke</em>', 'Fuzzy search across every window, every workspace and everything you ever archived. Press <kbd>⌥⇧K</kbd>, type, done.', [{ src: paletteImg, w: 620 }]);
+  await frame(canvas, '1-palette', 'Find any tab in <em>one keystroke</em>', 'Fuzzy search across every window, every workspace and everything you ever archived. Press <kbd>⌥⇧K</kbd>, type, done.', [{ src: paletteImg, w: 560 }]);
   await frame(canvas, '2-initialize', 'One click. <em>Everything in its place.</em>', 'Your pins in exact order, preset groups rebuilt, clutter archived. Tabs that are already open are reused, so logins and drafts survive.', [{ src: nowImg, w: 380 }]);
   await frame(canvas, '3-workspaces', 'Switch between <em>whole setups</em>', 'Work, Research, Side project — each workspace remembers its own tabs and restores them lazily when you come back.', [{ src: optionsImg, w: 700 }]);
   await frame(canvas, '4-undo', '<em>Undo</em> anything. Lose nothing.', 'Every change is snapshotted first. Roll the whole browser back to any moment, or dig a tab out of the searchable archive.', [{ src: timelineImg, w: 330 }, { src: archiveImg, w: 330 }]);

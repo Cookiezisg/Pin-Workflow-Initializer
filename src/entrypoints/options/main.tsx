@@ -11,17 +11,17 @@ import { chromeStore, saveSecrets } from '../../engine/chrome-store';
 import { builtinAvailability, requiredOrigins, suggestGroups } from '../../lib/ai';
 import { t } from '../../lib/i18n';
 import { call } from '../../lib/rpc';
-import { ColorPicker, Favicon, Icon, Kbd, summaryText, Toggle, useAction, useAppData, useToast, type AppData } from '../../ui/kit';
+import { ColorPicker, Favicon, Icon, Kbd, Menu, summaryText, Toggle, useAction, useAppData, useToast, type AppData, type ShowToast } from '../../ui/kit';
 import './options.css';
 
 type Section = 'workspaces' | 'rules' | 'automation' | 'ai' | 'general' | 'data';
 const SECTIONS: { id: Section; label: string; icon: string }[] = [
-  { id: 'workspaces', label: 'Workspaces', icon: 'layers' },
-  { id: 'rules', label: 'Rules', icon: 'wand' },
+  { id: 'workspaces', label: 'Workspaces', icon: 'workspaces' },
+  { id: 'rules', label: 'Rules', icon: 'rule' },
   { id: 'automation', label: 'Automation', icon: 'clock' },
-  { id: 'ai', label: 'AI', icon: 'sparkles' },
-  { id: 'general', label: 'General', icon: 'settings' },
-  { id: 'data', label: 'Data', icon: 'archive' },
+  { id: 'ai', label: 'AI', icon: 'ai' },
+  { id: 'general', label: 'General', icon: 'general' },
+  { id: 'data', label: 'Data', icon: 'data' },
 ];
 
 function useHash(): [string, (h: string) => void] {
@@ -68,29 +68,18 @@ function App() {
   if (!data) return null;
   return (
     <div class="layout">
+      <header class="topbar">
+        <img src="/icon-32.png" width={24} height={24} alt="" />
+        <span class="topbar-title">Pin Workflow</span>
+        <span class="grow" />
+        {saver.state === 'error' && <span class="small danger">{t('Could not save')}</span>}
+      </header>
       <aside class="nav">
-        <div class="brand">
-          <img src="/icon-128.png" width={28} height={28} alt="" />
-          <div>
-            <div class="brand-name">Pin Workflow</div>
-            <div class="faint small">v{chrome.runtime.getManifest().version}</div>
-          </div>
-        </div>
         {SECTIONS.map((s) => (
           <a key={s.id} href={`#${s.id}`} class="nav-item" aria-current={section === s.id}>
             <Icon name={s.icon} /> {t(s.label)}
           </a>
         ))}
-        <div class="grow" />
-        <div class={`save-state ${saver.state}`}>
-          {saver.state === 'saving' && t('Saving…')}
-          {saver.state === 'saved' && (
-            <>
-              <Icon name="check" size={14} /> {t('Saved')}
-            </>
-          )}
-          {saver.state === 'error' && t('Could not save')}
-        </div>
       </aside>
       <main class="content">
         {banner && <Banner kind={banner} onClose={() => setHash('workspaces')} />}
@@ -108,36 +97,40 @@ function App() {
 
 function Banner({ kind, onClose }: { kind: 'welcome' | 'upgraded'; onClose: () => void }) {
   return (
-    <div class="banner">
-      <div class="grow">
-        <h2>{kind === 'welcome' ? t('Welcome to Pin Workflow') : t('Pin Workflow 2.0 is here')}</h2>
-        <p>
-          {kind === 'welcome'
-            ? t('Press {0} to initialize your workspace, {1} for the command palette. Everything is undoable.', '⌥⇧C', '⌥⇧K')
-            : t('Your pinned sites moved into the “Main” workspace. Initializing no longer destroys tabs: they are archived and every run can be undone.')}
-        </p>
-        <ul>
-          <li>{t('Workspaces: switch between complete tab setups, each remembering its own tabs')}</li>
-          <li>{t('Command palette (⌥⇧K): fuzzy search every tab, workspace, action and the archive')}</li>
-          <li>{t('Timeline & undo (⌥⇧Z): every change is snapshotted first')}</li>
-          <li>{t('Rules, schedules, idle-tab archiving and AI grouping')}</li>
-        </ul>
+    <div class="card banner">
+      <div class="banner-title">{kind === 'welcome' ? t('Welcome to Pin Workflow') : t('Pin Workflow 2.0 is here')}</div>
+      <p class="muted">
+        {kind === 'welcome'
+          ? t('Press {0} to initialize your workspace, {1} for the command palette. Everything is undoable.', '⌥⇧C', '⌥⇧K')
+          : t('Your pinned sites moved into the “Main” workspace. Initializing no longer destroys tabs: they are archived and every run can be undone.')}
+      </p>
+      <div class="row" style={{ justifyContent: 'flex-end' }}>
+        <button class="btn" onClick={onClose}>
+          {t('Got it')}
+        </button>
       </div>
-      <button class="btn ghost icon" onClick={onClose}>
-        <Icon name="x" />
-      </button>
     </div>
+  );
+}
+
+/** A titled card of setting rows, like chrome://settings. */
+function Card({ title, children }: { title?: string; children: ComponentChildren }) {
+  return (
+    <>
+      {title && <h2 class="card-title">{title}</h2>}
+      <div class="card settings-card">{children}</div>
+    </>
   );
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ComponentChildren }) {
   return (
-    <div class="field">
-      <div class="field-label">
+    <div class="setting-row">
+      <div class="grow">
         <div>{label}</div>
-        {hint && <div class="faint small">{hint}</div>}
+        {hint && <div class="small muted">{hint}</div>}
       </div>
-      <div class="field-control">{children}</div>
+      <div class="control">{children}</div>
     </div>
   );
 }
@@ -161,9 +154,10 @@ function urlValid(u: string): boolean {
 
 // ---------------------------------------------------------------- Workspaces
 
-function WorkspacesSection({ data, saver, toast }: { data: AppData; saver: Saver; toast: (m: string, k?: 'info' | 'error') => void }) {
+function WorkspacesSection({ data, saver, toast }: { data: AppData; saver: Saver; toast: ShowToast }) {
   const [list, setList] = useState<Workspace[]>(data.workspaces);
-  const [selId, setSelId] = useState(data.active?.id ?? data.workspaces[0]?.id);
+  const [hash, setHash] = useHash();
+  const selId = hash.startsWith('workspaces/') ? hash.slice('workspaces/'.length) : null;
   const action = useAction(toast);
   // Follow external changes (e.g. a workspace created from the palette) unless we're mid-edit.
   useEffect(() => {
@@ -174,7 +168,7 @@ function WorkspacesSection({ data, saver, toast }: { data: AppData; saver: Saver
     setList(next);
     saver.save('workspaces', () => chromeStore.saveWorkspaces(next));
   };
-  const sel = list.find((w) => w.id === selId) ?? list[0];
+  const sel = selId ? list.find((w) => w.id === selId) : undefined;
   const update = (patch: Partial<Workspace>) => sel && persist(list.map((w) => (w.id === sel.id ? { ...w, ...patch } : w)));
   const move = (i: number, d: -1 | 1) => {
     const next = [...list];
@@ -183,66 +177,75 @@ function WorkspacesSection({ data, saver, toast }: { data: AppData; saver: Saver
     persist(next);
   };
 
+  if (sel) {
+    return (
+      <WorkspaceEditor
+        key={sel.id}
+        ws={sel}
+        isActive={sel.id === data.active?.id}
+        canDelete={list.length > 1}
+        onBack={() => setHash('workspaces')}
+        onChange={update}
+        onDelete={() => {
+          persist(list.filter((w) => w.id !== sel.id));
+          setHash('workspaces');
+        }}
+        onApply={() =>
+          void action.run('apply', () => (sel.id === data.active?.id ? call('apply', { workspaceId: sel.id }) : call('switchTo', { workspaceId: sel.id })), (r) =>
+            summaryText(r.summary),
+          )
+        }
+        busy={!!action.busy}
+      />
+    );
+  }
+
   return (
-    <div class="ws-layout">
-      <div class="ws-list">
-        <h1>{t('Workspaces')}</h1>
+    <div class="section">
+      <h1>{t('Workspaces')}</h1>
+      <div class="card settings-card">
         {list.map((w, i) => (
-          <div key={w.id} class={`ws-item g-${w.color}`} aria-current={w.id === sel?.id} onClick={() => setSelId(w.id)}>
-            <span class="ws-emoji">{w.icon}</span>
-            <span class="grow ellipsis">{w.name}</span>
-            {w.id === data.active?.id && <span class="badge">{t('active')}</span>}
-            <span class="reorder" onClick={(e) => e.stopPropagation()}>
-              <button class="btn ghost sm icon" disabled={i === 0} onClick={() => move(i, -1)} title={t('Move up')}>
-                <Icon name="up" size={14} />
+          <a key={w.id} class="setting-row link-row" href={`#workspaces/${w.id}`}>
+            <span class={`dot bg-g g-${w.color}`} />
+            <div class="grow">
+              <div class="ellipsis">{w.name}</div>
+              <div class="small muted">
+                {w.id === data.active?.id ? `${t('Current')} · ` : ''}
+                {t(w.pins.length === 1 ? '1 pin' : '{0} pins', w.pins.length)}
+                {w.groups.length > 0 && ` · ${t(w.groups.length === 1 ? '1 group' : '{0} groups', w.groups.length)}`}
+              </div>
+            </div>
+            <span class="hover-only row" onClick={(e) => (e.preventDefault(), e.stopPropagation())}>
+              <button class="btn icon sm" disabled={i === 0} onClick={() => move(i, -1)} title={t('Move up')}>
+                <Icon name="up" />
               </button>
-              <button class="btn ghost sm icon" disabled={i === list.length - 1} onClick={() => move(i, 1)} title={t('Move down')}>
-                <Icon name="down" size={14} />
+              <button class="btn icon sm" disabled={i === list.length - 1} onClick={() => move(i, 1)} title={t('Move down')}>
+                <Icon name="down" />
               </button>
             </span>
-          </div>
+            <Icon name="chevron" class="faint" />
+          </a>
         ))}
-        <button
-          class="btn"
-          onClick={() => {
-            const w = newWorkspace({ name: t('Workspace {0}', list.length + 1) });
-            persist([...list, w]);
-            setSelId(w.id);
-          }}
-        >
-          <Icon name="plus" /> {t('New workspace')}
-        </button>
-        <p class="faint small">{t('Tip: “Save window as new workspace” in the command palette captures what you have open right now.')}</p>
+        <div class="setting-row">
+          <button
+            class="btn"
+            onClick={() => {
+              const w = newWorkspace({ name: t('Workspace {0}', list.length + 1) });
+              persist([...list, w]);
+              setHash(`workspaces/${w.id}`);
+            }}
+          >
+            {t('Add workspace')}
+          </button>
+        </div>
       </div>
-      {sel && (
-        <WorkspaceEditor
-          key={sel.id}
-          ws={sel}
-          isActive={sel.id === data.active?.id}
-          canDelete={list.length > 1}
-          onChange={update}
-          onDelete={() => {
-            const next = list.filter((w) => w.id !== sel.id);
-            persist(next);
-            setSelId(next[0]?.id);
-          }}
-          onApply={() =>
-            void action.run('apply', () => (sel.id === data.active?.id ? call('apply', { workspaceId: sel.id }) : call('switchTo', { workspaceId: sel.id })), (r) =>
-              summaryText(r.summary),
-            )
-          }
-          busy={!!action.busy}
-        />
-      )}
     </div>
   );
 }
 
-const EMOJI = ['💼', '🎯', '📌', '🏠', '📚', '🧪', '🎨', '🛠️', '📈', '✈️', '🎮', '🌙', '🔬', '💬', '🗂️', '⚡'];
-
 function WorkspaceEditor(props: {
   ws: Workspace; isActive: boolean; canDelete: boolean; busy: boolean;
-  onChange: (p: Partial<Workspace>) => void; onDelete: () => void; onApply: () => void;
+  onBack: () => void; onChange: (p: Partial<Workspace>) => void; onDelete: () => void; onApply: () => void;
 }) {
   const { ws, onChange } = props;
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -258,32 +261,27 @@ function WorkspaceEditor(props: {
   };
 
   return (
-    <div class="editor">
-      <div class="row">
-        <input class="input title-input grow" value={ws.name} maxLength={60} onInput={(e) => onChange({ name: (e.target as HTMLInputElement).value })} aria-label={t('Name')} />
+    <div class="section">
+      <div class="subpage-head">
+        <button class="btn icon" onClick={props.onBack} title={t('Back')}>
+          <Icon name="back" />
+        </button>
+        <h1 class="grow ellipsis">{ws.name || t('Workspace')}</h1>
         <button class="btn primary" disabled={props.busy} onClick={props.onApply}>
-          <Icon name="play" /> {props.isActive ? t('Initialize now') : t('Switch to it')}
+          {props.isActive ? t('Initialize now') : t('Switch to it')}
         </button>
       </div>
 
-      <Field label={t('Icon')}>
-        <div class="row wrap">
-          <input class="input emoji-input" value={ws.icon} maxLength={8} onInput={(e) => onChange({ icon: (e.target as HTMLInputElement).value })} aria-label={t('Icon')} />
-          {EMOJI.map((e) => (
-            <button key={e} class="emoji-btn" aria-pressed={ws.icon === e} onClick={() => onChange({ icon: e })}>
-              {e}
-            </button>
-          ))}
-        </div>
-      </Field>
-      <Field label={t('Color')}>
-        <ColorPicker value={ws.color} onChange={(color) => onChange({ color })} />
-      </Field>
+      <div class="card settings-card">
+        <Field label={t('Name')}>
+          <input class="input wide" value={ws.name} maxLength={60} onInput={(e) => onChange({ name: (e.target as HTMLInputElement).value })} aria-label={t('Name')} />
+        </Field>
+        <Field label={t('Color')}>
+          <ColorPicker value={ws.color} onChange={(color) => onChange({ color })} />
+        </Field>
+      </div>
 
-      <h3>
-        {t('Pinned tabs')} <span class="faint small">{t('kept in this order, reused when already open')}</span>
-      </h3>
-      <div class="col">
+      <Card title={t('Pinned tabs')}>
         {ws.pins.map((p, i) => (
           <PinRow
             key={p.id}
@@ -301,20 +299,17 @@ function WorkspaceEditor(props: {
             onRemove={() => setPins(ws.pins.filter((x) => x.id !== p.id))}
           />
         ))}
-        <div class="row">
-          <button class="btn sm" onClick={() => setPins([...ws.pins, pin('https://')])}>
-            <Icon name="plus" /> {t('Add pin')}
+        <div class="setting-row">
+          <button class="btn" onClick={() => setPins([...ws.pins, pin('https://')])}>
+            {t('Add pin')}
           </button>
-          <button class="btn sm ghost" onClick={() => void addCurrentPins()}>
-            <Icon name="pin" /> {t('Add this window’s pinned tabs')}
+          <button class="btn ghost" onClick={() => void addCurrentPins()}>
+            {t('Add this window’s pinned tabs')}
           </button>
         </div>
-      </div>
+      </Card>
 
-      <h3>
-        {t('Preset groups')} <span class="faint small">{t('created or completed every time')}</span>
-      </h3>
-      <div class="col">
+      <Card title={t('Tab groups')}>
         {ws.groups.map((g) => (
           <GroupEditor
             key={g.id}
@@ -323,52 +318,51 @@ function WorkspaceEditor(props: {
             onRemove={() => onChange({ groups: ws.groups.filter((x) => x.id !== g.id) })}
           />
         ))}
-        <div>
-          <button class="btn sm" onClick={() => onChange({ groups: [...ws.groups, { id: uid(), title: t('New group'), color: 'blue', collapsed: true, tabs: [] }] })}>
-            <Icon name="plus" /> {t('Add group')}
+        <div class="setting-row">
+          <button class="btn" onClick={() => onChange({ groups: [...ws.groups, { id: uid(), title: t('New group'), color: 'blue', collapsed: true, tabs: [] }] })}>
+            {t('Add group')}
           </button>
         </div>
-      </div>
+      </Card>
 
-      <h3>{t('When initializing')}</h3>
-      <Field label={t('Loose tabs')} hint={t('Ungrouped tabs that aren’t pins')}>
-        <select class="select" value={ws.ungrouped} onChange={(e) => onChange({ ungrouped: (e.target as HTMLSelectElement).value as LeftoverPolicy })}>
-          <option value="archive">{t('Archive them (recoverable)')}</option>
-          <option value="keep">{t('Keep them')}</option>
-          <option value="close">{t('Close them')}</option>
-        </select>
-      </Field>
-      <Field label={t('Other windows')}>
-        <select class="select" value={ws.otherWindows} onChange={(e) => onChange({ otherWindows: (e.target as HTMLSelectElement).value as OtherWindowsPolicy })}>
-          <option value="keep">{t('Leave them alone')}</option>
-          <option value="merge">{t('Merge into this window')}</option>
-          <option value="archive">{t('Archive and close them')}</option>
-          <option value="close">{t('Close them')}</option>
-        </select>
-      </Field>
-      <SwitchField label={t('Collapse groups')} value={ws.collapseGroups} onChange={(v) => onChange({ collapseGroups: v })} />
-      <SwitchField label={t('Finish on a fresh new tab')} value={ws.openNewTab} onChange={(v) => onChange({ openNewTab: v })} />
+      <Card title={t('When initializing')}>
+        <Field label={t('Loose tabs')} hint={t('Ungrouped tabs that aren’t pins')}>
+          <select class="select" value={ws.ungrouped} onChange={(e) => onChange({ ungrouped: (e.target as HTMLSelectElement).value as LeftoverPolicy })}>
+            <option value="archive">{t('Archive them (recoverable)')}</option>
+            <option value="keep">{t('Keep them')}</option>
+            <option value="close">{t('Close them')}</option>
+          </select>
+        </Field>
+        <Field label={t('Other windows')}>
+          <select class="select" value={ws.otherWindows} onChange={(e) => onChange({ otherWindows: (e.target as HTMLSelectElement).value as OtherWindowsPolicy })}>
+            <option value="keep">{t('Leave them alone')}</option>
+            <option value="merge">{t('Merge into this window')}</option>
+            <option value="archive">{t('Archive and close them')}</option>
+            <option value="close">{t('Close them')}</option>
+          </select>
+        </Field>
+        <SwitchField label={t('Collapse groups')} value={ws.collapseGroups} onChange={(v) => onChange({ collapseGroups: v })} />
+        <SwitchField label={t('Finish on a fresh new tab')} value={ws.openNewTab} onChange={(v) => onChange({ openNewTab: v })} />
+      </Card>
 
-      <h3>{t('Session')}</h3>
-      <Field
-        label={t('Remembered tabs')}
-        hint={t('What was open when you last left this workspace. Restored when you switch back.')}
-      >
-        <div class="row">
-          <span class="muted">{sessionInfo === null ? '…' : t('{0} tabs', sessionInfo)}</span>
-          {!!sessionInfo && (
-            <button class="btn sm" onClick={() => void chromeStore.setSession(ws.id, undefined).then(() => setSessionInfo(0))}>
-              {t('Forget')}
-            </button>
-          )}
-        </div>
-      </Field>
-
-      <div class="danger-zone">
-        {confirmDelete ? (
+      <Card title={t('Session')}>
+        <Field label={t('Remembered tabs')} hint={t('Restored when you switch back to this workspace')}>
           <div class="row">
+            <span class="muted">{sessionInfo === null ? '' : t(sessionInfo === 1 ? '1 tab' : '{0} tabs', sessionInfo)}</span>
+            {!!sessionInfo && (
+              <button class="btn" onClick={() => void chromeStore.setSession(ws.id, undefined).then(() => setSessionInfo(0))}>
+                {t('Forget')}
+              </button>
+            )}
+          </div>
+        </Field>
+      </Card>
+
+      <div class="card settings-card">
+        {confirmDelete ? (
+          <div class="setting-row">
             <span class="grow">{t('Delete “{0}” and its remembered tabs?', ws.name)}</span>
-            <button class="btn" onClick={() => setConfirmDelete(false)}>
+            <button class="btn ghost" onClick={() => setConfirmDelete(false)}>
               {t('Cancel')}
             </button>
             <button class="btn danger" onClick={props.onDelete}>
@@ -376,9 +370,11 @@ function WorkspaceEditor(props: {
             </button>
           </div>
         ) : (
-          <button class="btn ghost danger" disabled={!props.canDelete} onClick={() => setConfirmDelete(true)}>
-            <Icon name="trash" /> {t('Delete workspace')}
-          </button>
+          <Field label={t('Delete workspace')}>
+            <button class="btn danger" disabled={!props.canDelete} onClick={() => setConfirmDelete(true)}>
+              {t('Delete')}
+            </button>
+          </Field>
         )}
       </div>
     </div>
@@ -393,32 +389,33 @@ function PinRow(props: {
   const valid = urlValid(props.url);
   const matchValid = !props.match || compilePattern(props.match) !== null;
   return (
-    <div class="pin-row">
+    <div class="setting-row col-row">
       <div class="row">
         {valid ? <Favicon url={props.url} /> : <span class="favicon" />}
         <input class={`input mono grow ${valid ? '' : 'invalid'}`} value={props.url} placeholder="https://" onInput={(e) => props.onChange({ url: (e.target as HTMLInputElement).value.trim() })} />
-        <button class={`btn ghost sm ${advanced ? 'on' : ''}`} title={t('Custom matching')} onClick={() => setAdvanced(!advanced)}>
-          {t('Match')}
-        </button>
-        <button class="btn ghost sm icon" disabled={props.first} onClick={() => props.onMove(-1)}>
-          <Icon name="up" size={14} />
-        </button>
-        <button class="btn ghost sm icon" disabled={props.last} onClick={() => props.onMove(1)}>
-          <Icon name="down" size={14} />
-        </button>
-        <button class="btn ghost sm icon" onClick={props.onRemove} title={t('Remove')}>
-          <Icon name="x" size={14} />
-        </button>
+        <Menu
+          label={t('More actions')}
+          trigger={(open) => (
+            <button class="btn icon sm" title={t('More actions')} onClick={open}>
+              <Icon name="more" />
+            </button>
+          )}
+          items={[
+            { label: t('Move up'), icon: 'up', disabled: props.first, onSelect: () => props.onMove(-1) },
+            { label: t('Move down'), icon: 'down', disabled: props.last, onSelect: () => props.onMove(1) },
+            { label: advanced ? t('Hide custom matching') : t('Custom matching'), icon: 'rule', onSelect: () => setAdvanced(!advanced) },
+            { label: t('Remove'), icon: 'trash', onSelect: props.onRemove },
+          ]}
+        />
       </div>
       {advanced && (
-        <div class="row match-row">
+        <div class="row indent">
           <input
             class={`input mono grow ${matchValid ? '' : 'invalid'}`}
             value={props.match ?? ''}
             placeholder={t('e.g. *://mail.google.com/*  or  /regex/')}
             onInput={(e) => props.onChange({ match: (e.target as HTMLInputElement).value || undefined })}
           />
-          <span class="faint small">{t('Which open tabs count as this pin. Empty = same site and path.')}</span>
         </div>
       )}
     </div>
@@ -427,14 +424,14 @@ function PinRow(props: {
 
 function GroupEditor({ group, onChange, onRemove }: { group: GroupSpec; onChange: (p: Partial<GroupSpec>) => void; onRemove: () => void }) {
   return (
-    <div class={`group-card g-${group.color}`}>
+    <div class={`setting-row col-row g-${group.color}`}>
       <div class="row">
         <input class="input grow" value={group.title} onInput={(e) => onChange({ title: (e.target as HTMLInputElement).value })} aria-label={t('Group title')} />
-        <ColorPicker value={group.color} onChange={(color) => onChange({ color })} />
-        <button class="btn ghost sm icon" onClick={onRemove} title={t('Remove')}>
-          <Icon name="trash" size={14} />
+        <button class="btn icon sm" onClick={onRemove} title={t('Remove')}>
+          <Icon name="trash" />
         </button>
       </div>
+      <ColorPicker value={group.color} onChange={(color) => onChange({ color })} />
       {group.tabs.map((tb, i) => (
         <div key={i} class="row">
           <input
@@ -442,18 +439,18 @@ function GroupEditor({ group, onChange, onRemove }: { group: GroupSpec; onChange
             value={tb.url}
             onInput={(e) => onChange({ tabs: group.tabs.map((x, j) => (j === i ? { ...x, url: (e.target as HTMLInputElement).value.trim() } : x)) })}
           />
-          <button class="btn ghost sm icon" onClick={() => onChange({ tabs: group.tabs.filter((_, j) => j !== i) })}>
-            <Icon name="x" size={14} />
+          <button class="btn icon sm" title={t('Remove')} onClick={() => onChange({ tabs: group.tabs.filter((_, j) => j !== i) })}>
+            <Icon name="x" />
           </button>
         </div>
       ))}
       <div class="row">
-        <button class="btn sm ghost" onClick={() => onChange({ tabs: [...group.tabs, { url: 'https://' }] })}>
-          <Icon name="plus" /> {t('Add tab')}
+        <button class="btn ghost sm" onClick={() => onChange({ tabs: [...group.tabs, { url: 'https://' }] })}>
+          {t('Add tab')}
         </button>
         <span class="grow" />
-        <span class="small muted">{t('Start collapsed')}</span>
-        <Toggle checked={group.collapsed} onChange={(collapsed) => onChange({ collapsed })} />
+        <span class="muted">{t('Start collapsed')}</span>
+        <Toggle checked={group.collapsed} onChange={(collapsed) => onChange({ collapsed })} label={t('Start collapsed')} />
       </div>
     </div>
   );
@@ -480,23 +477,20 @@ function RulesSection({ data, saver }: { data: AppData; saver: Saver }) {
   return (
     <div class="section">
       <h1>{t('Rules')}</h1>
-      <p class="muted">{t('Act on tabs as they navigate. First matching rule wins. Scope a rule to workspaces to make focus modes.')}</p>
-      <div class="card col">
-        <div class="row">
-          <Icon name="search" />
-          <input class="input mono grow" placeholder={t('Test a URL…')} value={testUrl} onInput={(e) => setTestUrl((e.target as HTMLInputElement).value)} />
-        </div>
-        {testUrl && (
-          <div class="small">
-            {hit ? (
-              <span class="ok">{t('Rule #{0} matches in the current workspace', s.rules.indexOf(hit.rule) + 1)}</span>
-            ) : (
-              <span class="muted">{t('No rule matches in the current workspace')}</span>
-            )}
+      <div class="card settings-card">
+        <div class="setting-row">
+          <div class="searchfield grow">
+            <Icon name="search" size={18} />
+            <input class="grow" placeholder={t('Test a URL')} value={testUrl} onInput={(e) => setTestUrl((e.target as HTMLInputElement).value)} />
           </div>
-        )}
+          {testUrl && (
+            <span class="small muted nowrap">
+              {hit ? t('Rule {0} matches', s.rules.indexOf(hit.rule) + 1) : t('No rule matches')}
+            </span>
+          )}
+        </div>
       </div>
-      <div class="col">
+      <Card title={t('Rules run in order; the first match wins')}>
         {s.rules.map((r, i) => (
           <RuleRow
             key={r.id}
@@ -508,16 +502,15 @@ function RulesSection({ data, saver }: { data: AppData; saver: Saver }) {
             onRemove={() => setRules(s.rules.filter((x) => x.id !== r.id))}
           />
         ))}
-        {s.rules.length === 0 && <div class="empty card">{t('No rules yet.')}</div>}
-        <div class="row">
+        <div class="setting-row">
           <button
             class="btn"
             onClick={() => setRules([...s.rules, { id: uid(), enabled: true, kind: 'domain', pattern: '', action: { type: 'group', title: t('New group'), color: 'blue' }, workspaceIds: [] }])}
           >
-            <Icon name="plus" /> {t('Add rule')}
+            {t('Add rule')}
           </button>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
@@ -529,10 +522,9 @@ function RuleRow({ n, rule, workspaces, highlight, onChange, onRemove }: {
   const setAction = (type: RuleAction['type']) =>
     onChange({ action: type === 'group' ? { type, title: rule.action.type === 'group' ? rule.action.title : t('New group'), color: 'blue' } : { type } });
   return (
-    <div class={`card rule ${highlight ? 'hit' : ''} ${rule.enabled ? '' : 'disabled'}`}>
-      <div class="row wrap">
-        <span class="faint small">#{n}</span>
-        <Toggle checked={rule.enabled} onChange={(enabled) => onChange({ enabled })} />
+    <div class={`setting-row col-row rule ${highlight ? 'hit' : ''} ${rule.enabled ? '' : 'disabled'}`}>
+      <div class="row">
+        <span class="muted rule-n">{n}</span>
         <select class="select" value={rule.kind} onChange={(e) => onChange({ kind: (e.target as HTMLSelectElement).value as Rule['kind'] })}>
           <option value="domain">{t('Domain')}</option>
           <option value="glob">{t('URL pattern')}</option>
@@ -544,12 +536,12 @@ function RuleRow({ n, rule, workspaces, highlight, onChange, onRemove }: {
           placeholder={rule.kind === 'domain' ? 'github.com' : rule.kind === 'glob' ? '*://github.com/*/pull/*' : '^https://(www\\.)?youtube\\.com/'}
           onInput={(e) => onChange({ pattern: (e.target as HTMLInputElement).value })}
         />
-        <button class="btn ghost sm icon" onClick={onRemove} title={t('Remove')}>
-          <Icon name="trash" size={14} />
+        <Toggle checked={rule.enabled} onChange={(enabled) => onChange({ enabled })} label={t('Enabled')} />
+        <button class="btn icon sm" onClick={onRemove} title={t('Remove')}>
+          <Icon name="trash" />
         </button>
       </div>
-      <div class="row wrap">
-        <span class="muted small">{t('then')}</span>
+      <div class="row wrap indent">
         <select class="select" value={rule.action.type} onChange={(e) => setAction((e.target as HTMLSelectElement).value as RuleAction['type'])}>
           <option value="group">{t('Put in group')}</option>
           <option value="pin">{t('Pin it')}</option>
@@ -566,9 +558,8 @@ function RuleRow({ n, rule, workspaces, highlight, onChange, onRemove }: {
           </>
         )}
       </div>
-      <div class="row wrap">
-        <span class="muted small">{t('in')}</span>
-        <button class={`chip ${rule.workspaceIds.length === 0 ? 'on' : ''}`} onClick={() => onChange({ workspaceIds: [] })}>
+      <div class="row wrap indent">
+        <button class="choice" aria-pressed={rule.workspaceIds.length === 0} onClick={() => onChange({ workspaceIds: [] })}>
           {t('All workspaces')}
         </button>
         {workspaces.map((w) => {
@@ -576,10 +567,11 @@ function RuleRow({ n, rule, workspaces, highlight, onChange, onRemove }: {
           return (
             <button
               key={w.id}
-              class={`chip ${on ? 'on' : ''}`}
+              class="choice"
+              aria-pressed={on}
               onClick={() => onChange({ workspaceIds: on ? rule.workspaceIds.filter((x) => x !== w.id) : [...rule.workspaceIds, w.id] })}
             >
-              {w.icon} {w.name}
+              {w.name}
             </button>
           );
         })}
@@ -599,81 +591,83 @@ function AutomationSection({ data, saver }: { data: AppData; saver: Saver }) {
   return (
     <div class="section">
       <h1>{t('Automation')}</h1>
-      <h3>{t('Schedules')}</h3>
-      <p class="muted small">{t('Switch workspace automatically, e.g. Work at 9:00 on weekdays, Personal at 18:30.')}</p>
-      <div class="col">
+      <Card title={t('Schedules')}>
         {s.schedules.map((sc) => {
           const next = nextRun(sc, new Date());
           const patch = (p: Partial<Schedule>) => setSchedules(s.schedules.map((x) => (x.id === sc.id ? { ...x, ...p } : x)));
           return (
-            <div key={sc.id} class="card row wrap">
-              <Toggle checked={sc.enabled} onChange={(enabled) => patch({ enabled })} />
-              <select class="select" value={sc.workspaceId} onChange={(e) => patch({ workspaceId: (e.target as HTMLSelectElement).value })}>
-                {data.workspaces.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.icon} {w.name}
-                  </option>
-                ))}
-              </select>
-              <input type="time" class="input" value={sc.time} onInput={(e) => patch({ time: (e.target as HTMLInputElement).value || '09:00' })} />
+            <div key={sc.id} class="setting-row col-row">
+              <div class="row">
+                <select class="select" value={sc.workspaceId} onChange={(e) => patch({ workspaceId: (e.target as HTMLSelectElement).value })}>
+                  {data.workspaces.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+                <input type="time" class="input" value={sc.time} onInput={(e) => patch({ time: (e.target as HTMLInputElement).value || '09:00' })} />
+                <span class="small muted grow">{next ? t('next: {0}', next.toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })) : t('never')}</span>
+                <Toggle checked={sc.enabled} onChange={(enabled) => patch({ enabled })} label={t('Enabled')} />
+                <button class="btn icon sm" title={t('Remove')} onClick={() => setSchedules(s.schedules.filter((x) => x.id !== sc.id))}>
+                  <Icon name="trash" />
+                </button>
+              </div>
               <div class="row days">
                 {DAYS.map((d) => (
-                  <button key={d} class={`chip ${sc.days.includes(d) ? 'on' : ''}`} onClick={() => patch({ days: sc.days.includes(d) ? sc.days.filter((x) => x !== d) : [...sc.days, d] })}>
+                  <button key={d} class="choice" aria-pressed={sc.days.includes(d)} onClick={() => patch({ days: sc.days.includes(d) ? sc.days.filter((x) => x !== d) : [...sc.days, d] })}>
                     {dayName(d)}
                   </button>
                 ))}
               </div>
-              <span class="faint small grow">{next ? t('next: {0}', next.toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })) : t('never')}</span>
-              <button class="btn ghost sm icon" onClick={() => setSchedules(s.schedules.filter((x) => x.id !== sc.id))}>
-                <Icon name="trash" size={14} />
-              </button>
             </div>
           );
         })}
-        <div>
+        <div class="setting-row">
           <button
             class="btn"
             onClick={() => setSchedules([...s.schedules, { id: uid(), enabled: true, workspaceId: data.workspaces[0]!.id, days: [1, 2, 3, 4, 5], time: '09:00' }])}
           >
-            <Icon name="plus" /> {t('Add schedule')}
+            {t('Add schedule')}
           </button>
         </div>
-      </div>
+      </Card>
 
-      <h3>{t('Tidying')}</h3>
-      <Field label={t('Archive idle tabs after')} hint={t('Unpinned tabs you haven’t looked at. 0 = off.')}>
-        <div class="row">
-          <input type="number" min={0} step={30} class="input num" value={s.idleArchiveMinutes} onInput={(e) => update({ idleArchiveMinutes: Math.max(0, Number((e.target as HTMLInputElement).value) || 0) })} />
-          <span class="muted">{t('minutes')}</span>
-        </div>
-      </Field>
-      <SwitchField label={t('Spare grouped tabs from idle archiving')} value={s.idleArchiveSkipGrouped} onChange={(v) => update({ idleArchiveSkipGrouped: v })} />
-      <SwitchField label={t('Close duplicates when initializing')} value={s.dedupeOnApply} onChange={(v) => update({ dedupeOnApply: v })} />
-      <SwitchField label={t('Jump to an already-open tab instead of opening a duplicate')} hint={t('Applies to tabs opened in the last few seconds')} value={s.dedupeLive} onChange={(v) => update({ dedupeLive: v })} />
+      <Card title={t('Tidying')}>
+        <Field label={t('Archive idle tabs after')} hint={t('Unpinned tabs you haven’t looked at. 0 = off.')}>
+          <div class="row">
+            <input type="number" min={0} step={30} class="input num" value={s.idleArchiveMinutes} onInput={(e) => update({ idleArchiveMinutes: Math.max(0, Number((e.target as HTMLInputElement).value) || 0) })} />
+            <span class="muted">{t('minutes')}</span>
+          </div>
+        </Field>
+        <SwitchField label={t('Spare grouped tabs from idle archiving')} value={s.idleArchiveSkipGrouped} onChange={(v) => update({ idleArchiveSkipGrouped: v })} />
+        <SwitchField label={t('Close duplicates when initializing')} value={s.dedupeOnApply} onChange={(v) => update({ dedupeOnApply: v })} />
+        <SwitchField label={t('Jump to an already-open tab instead of opening a duplicate')} hint={t('Applies to tabs opened in the last few seconds')} value={s.dedupeLive} onChange={(v) => update({ dedupeLive: v })} />
+      </Card>
 
-      <h3>{t('Sessions & safety')}</h3>
-      <SwitchField label={t('Lazy restore')} hint={t('Restored tabs load only when you open them. Saves memory when switching.')} value={s.lazyRestore} onChange={(v) => update({ lazyRestore: v })} />
-      <SwitchField label={t('Re-pin on browser start')} value={s.pinsOnStartup} onChange={(v) => update({ pinsOnStartup: v })} />
-      <Field label={t('Background snapshot every')} hint={t('Only when something changed. 0 = off.')}>
-        <div class="row">
-          <input type="number" min={0} class="input num" value={s.autoSnapshotMinutes} onInput={(e) => update({ autoSnapshotMinutes: Math.max(0, Number((e.target as HTMLInputElement).value) || 0) })} />
-          <span class="muted">{t('minutes')}</span>
-        </div>
-      </Field>
-      <Field label={t('Keep snapshots')}>
-        <input type="number" min={5} max={1000} class="input num" value={s.snapshotLimit} onInput={(e) => update({ snapshotLimit: Math.min(1000, Math.max(5, Number((e.target as HTMLInputElement).value) || 100)) })} />
-      </Field>
-      <Field label={t('Keep archived tabs')}>
-        <input type="number" min={50} max={50000} step={500} class="input num" value={s.archiveLimit} onInput={(e) => update({ archiveLimit: Math.min(50000, Math.max(50, Number((e.target as HTMLInputElement).value) || 5000)) })} />
-      </Field>
-      <SwitchField label={t('Notifications')} hint={t('For scheduled switches and idle archiving')} value={s.notifications} onChange={(v) => update({ notifications: v })} />
+      <Card title={t('Sessions & safety')}>
+        <SwitchField label={t('Lazy restore')} hint={t('Restored tabs load only when you open them. Saves memory when switching.')} value={s.lazyRestore} onChange={(v) => update({ lazyRestore: v })} />
+        <SwitchField label={t('Re-pin on browser start')} value={s.pinsOnStartup} onChange={(v) => update({ pinsOnStartup: v })} />
+        <Field label={t('Background snapshot every')} hint={t('Only when something changed. 0 = off.')}>
+          <div class="row">
+            <input type="number" min={0} class="input num" value={s.autoSnapshotMinutes} onInput={(e) => update({ autoSnapshotMinutes: Math.max(0, Number((e.target as HTMLInputElement).value) || 0) })} />
+            <span class="muted">{t('minutes')}</span>
+          </div>
+        </Field>
+        <Field label={t('Keep snapshots')}>
+          <input type="number" min={5} max={1000} class="input num" value={s.snapshotLimit} onInput={(e) => update({ snapshotLimit: Math.min(1000, Math.max(5, Number((e.target as HTMLInputElement).value) || 100)) })} />
+        </Field>
+        <Field label={t('Keep archived tabs')}>
+          <input type="number" min={50} max={50000} step={500} class="input num" value={s.archiveLimit} onInput={(e) => update({ archiveLimit: Math.min(50000, Math.max(50, Number((e.target as HTMLInputElement).value) || 5000)) })} />
+        </Field>
+        <SwitchField label={t('Notifications')} hint={t('For scheduled switches and idle archiving')} value={s.notifications} onChange={(v) => update({ notifications: v })} />
+      </Card>
     </div>
   );
 }
 
 // ---------------------------------------------------------------- AI
 
-function AiSection({ data, saver, toast }: { data: AppData; saver: Saver; toast: (m: string, k?: 'info' | 'error') => void }) {
+function AiSection({ data, saver, toast }: { data: AppData; saver: Saver; toast: ShowToast }) {
   const [s, update] = useSettingsEditor(data, saver);
   const [secrets, setSecrets] = useState<Secrets>({});
   const [builtin, setBuiltin] = useState<string>('…');
@@ -729,72 +723,76 @@ function AiSection({ data, saver, toast }: { data: AppData; saver: Saver; toast:
   return (
     <div class="section">
       <h1>{t('AI')}</h1>
-      <p class="muted">{t('Smart grouping sorts loose tabs into named groups. “Where was I?” recaps a window. Both are previewed before anything changes.')}</p>
-      <div class="providers">
+      <Card title={t('Smart grouping and “Where was I?”')}>
         {providers.map((p) => (
-          <button key={p.id} class="provider" aria-pressed={s.ai.provider === p.id} onClick={() => choose(p.id)}>
-            <b>{p.title}</b>
-            <span class="small muted">{p.desc}</span>
-          </button>
+          <label key={p.id} class="setting-row radio-row">
+            <input type="radio" name="provider" checked={s.ai.provider === p.id} onChange={() => choose(p.id)} />
+            <div class="grow">
+              <div>{p.title}</div>
+              <div class="small muted">{p.desc}</div>
+            </div>
+          </label>
         ))}
-      </div>
+      </Card>
 
-      {s.ai.provider === 'deepseek' && (
-        <>
-          <Field label={t('API key')} hint={t('Stored only on this device, never synced.')}>
-            <input type="password" class="input mono wide" value={secrets.deepseekKey ?? ''} placeholder="sk-…" autoComplete="off" onInput={(e) => setSecret({ deepseekKey: (e.target as HTMLInputElement).value.trim() })} />
-          </Field>
-          <Field label={t('Model')}>
-            <input class="input mono wide" value={s.ai.deepseekModel} onInput={(e) => setAi({ deepseekModel: (e.target as HTMLInputElement).value.trim() })} list="deepseek-models" />
-            <datalist id="deepseek-models">
-              <option value="deepseek-flash" />
-              <option value="deepseek-v4-pro" />
-            </datalist>
-          </Field>
-        </>
-      )}
-      {s.ai.provider === 'anthropic' && (
-        <>
-          <Field label={t('API key')} hint={t('Stored only on this device, never synced.')}>
-            <input type="password" class="input mono wide" value={secrets.anthropicKey ?? ''} placeholder="sk-ant-…" autoComplete="off" onInput={(e) => setSecret({ anthropicKey: (e.target as HTMLInputElement).value.trim() })} />
-          </Field>
-          <Field label={t('Model')}>
-            <input class="input mono wide" value={s.ai.anthropicModel} onInput={(e) => setAi({ anthropicModel: (e.target as HTMLInputElement).value.trim() })} list="claude-models" />
-            <datalist id="claude-models">
-              <option value="claude-opus-5-5" />
-              <option value="claude-sonnet-5-5" />
-              <option value="claude-haiku-5-5" />
-            </datalist>
-          </Field>
-        </>
-      )}
-      {s.ai.provider === 'openai' && (
-        <>
-          <Field label={t('Base URL')} hint={t('For Ollama: http://localhost:11434/v1')}>
-            <input class="input mono wide" value={s.ai.openaiBaseUrl} onInput={(e) => setAi({ openaiBaseUrl: (e.target as HTMLInputElement).value.trim() })} />
-          </Field>
-          <Field label={t('API key')} hint={t('Stored only on this device, never synced.')}>
-            <input type="password" class="input mono wide" value={secrets.openaiKey ?? ''} autoComplete="off" onInput={(e) => setSecret({ openaiKey: (e.target as HTMLInputElement).value.trim() })} />
-          </Field>
-          <Field label={t('Model')}>
-            <input class="input mono wide" value={s.ai.openaiModel} onInput={(e) => setAi({ openaiModel: (e.target as HTMLInputElement).value.trim() })} />
-          </Field>
-        </>
-      )}
       {s.ai.provider !== 'off' && (
-        <>
+        <div class="card settings-card">
+          {s.ai.provider === 'deepseek' && (
+            <>
+              <Field label={t('API key')} hint={t('Stored only on this device, never synced.')}>
+                <input type="password" class="input mono wide" value={secrets.deepseekKey ?? ''} placeholder="sk-…" autoComplete="off" onInput={(e) => setSecret({ deepseekKey: (e.target as HTMLInputElement).value.trim() })} />
+              </Field>
+              <Field label={t('Model')}>
+                <input class="input mono wide" value={s.ai.deepseekModel} onInput={(e) => setAi({ deepseekModel: (e.target as HTMLInputElement).value.trim() })} list="deepseek-models" />
+                <datalist id="deepseek-models">
+                  <option value="deepseek-flash" />
+                  <option value="deepseek-v4-pro" />
+                </datalist>
+              </Field>
+            </>
+          )}
+          {s.ai.provider === 'anthropic' && (
+            <>
+              <Field label={t('API key')} hint={t('Stored only on this device, never synced.')}>
+                <input type="password" class="input mono wide" value={secrets.anthropicKey ?? ''} placeholder="sk-ant-…" autoComplete="off" onInput={(e) => setSecret({ anthropicKey: (e.target as HTMLInputElement).value.trim() })} />
+              </Field>
+              <Field label={t('Model')}>
+                <input class="input mono wide" value={s.ai.anthropicModel} onInput={(e) => setAi({ anthropicModel: (e.target as HTMLInputElement).value.trim() })} list="claude-models" />
+                <datalist id="claude-models">
+                  <option value="claude-opus-5-5" />
+                  <option value="claude-sonnet-5-5" />
+                  <option value="claude-haiku-5-5" />
+                </datalist>
+              </Field>
+            </>
+          )}
+          {s.ai.provider === 'openai' && (
+            <>
+              <Field label={t('Base URL')} hint={t('For Ollama: http://localhost:11434/v1')}>
+                <input class="input mono wide" value={s.ai.openaiBaseUrl} onInput={(e) => setAi({ openaiBaseUrl: (e.target as HTMLInputElement).value.trim() })} />
+              </Field>
+              <Field label={t('API key')} hint={t('Stored only on this device, never synced.')}>
+                <input type="password" class="input mono wide" value={secrets.openaiKey ?? ''} autoComplete="off" onInput={(e) => setSecret({ openaiKey: (e.target as HTMLInputElement).value.trim() })} />
+              </Field>
+              <Field label={t('Model')}>
+                <input class="input mono wide" value={s.ai.openaiModel} onInput={(e) => setAi({ openaiModel: (e.target as HTMLInputElement).value.trim() })} />
+              </Field>
+            </>
+          )}
           <SwitchField label={t('Strip query strings')} hint={t('Send only site and path, never ?tokens=… or #fragments.')} value={s.ai.stripQuery} onChange={(v) => setAi({ stripQuery: v })} />
-          <div class="row">
-            {!granted && (
+          <Field label={granted ? t('Try it on this window') : t('Network access is needed to reach the provider')}>
+            {granted ? (
+              <button class="btn" disabled={!!action.busy} onClick={test}>
+                {action.busy && <span class="spinner" />}
+                {t('Test')}
+              </button>
+            ) : (
               <button class="btn" onClick={grant}>
-                {t('Grant network access')}
+                {t('Allow')}
               </button>
             )}
-            <button class="btn primary" disabled={!!action.busy || !granted} onClick={test}>
-              {action.busy ? <span class="spinner" /> : <Icon name="sparkles" />} {t('Test with this window')}
-            </button>
-          </div>
-        </>
+          </Field>
+        </div>
       )}
     </div>
   );
@@ -809,41 +807,42 @@ function GeneralSection({ data, saver }: { data: AppData; saver: Saver }) {
   return (
     <div class="section">
       <h1>{t('General')}</h1>
-      <Field label={t('Language')}>
-        <select class="select" value={s.locale} onChange={(e) => update({ locale: (e.target as HTMLSelectElement).value as Settings['locale'] })}>
-          <option value="auto">{t('Same as browser')}</option>
-          <option value="en">English</option>
-          <option value="zh">中文</option>
-        </select>
-      </Field>
-      <Field label={t('Theme')}>
-        <select class="select" value={s.theme} onChange={(e) => update({ theme: (e.target as HTMLSelectElement).value as Settings['theme'] })}>
-          <option value="auto">{t('System')}</option>
-          <option value="light">{t('Light')}</option>
-          <option value="dark">{t('Dark')}</option>
-        </select>
-      </Field>
-      <h3>{t('Keyboard shortcuts')}</h3>
-      <div class="card col">
+      <div class="card settings-card">
+        <Field label={t('Language')}>
+          <select class="select" value={s.locale} onChange={(e) => update({ locale: (e.target as HTMLSelectElement).value as Settings['locale'] })}>
+            <option value="auto">{t('Same as browser')}</option>
+            <option value="en">English</option>
+            <option value="zh">中文</option>
+          </select>
+        </Field>
+        <Field label={t('Theme')}>
+          <select class="select" value={s.theme} onChange={(e) => update({ theme: (e.target as HTMLSelectElement).value as Settings['theme'] })}>
+            <option value="auto">{t('System')}</option>
+            <option value="light">{t('Light')}</option>
+            <option value="dark">{t('Dark')}</option>
+          </select>
+        </Field>
+      </div>
+      <Card title={t('Keyboard shortcuts')}>
         {commands.map((c) => (
-          <div key={c.name} class="row">
+          <div key={c.name} class="setting-row">
             <span class="grow">{c.name === '_execute_action' ? t('Open command palette') : c.description}</span>
-            {c.shortcut ? <Kbd>{c.shortcut}</Kbd> : <span class="faint small">{t('not set')}</span>}
+            {c.shortcut ? <Kbd>{c.shortcut}</Kbd> : <span class="muted">{t('not set')}</span>}
           </div>
         ))}
-        <div>
-          <button class="btn sm" onClick={() => void chrome.tabs.create({ url: 'chrome://extensions/shortcuts' })}>
-            {t('Change shortcuts')}
-          </button>
-        </div>
-      </div>
+        <a class="setting-row link-row" href="chrome://extensions/shortcuts" onClick={(e) => (e.preventDefault(), void chrome.tabs.create({ url: 'chrome://extensions/shortcuts' }))}>
+          <span class="grow">{t('Change shortcuts')}</span>
+          <Icon name="open" class="faint" />
+        </a>
+      </Card>
+      <p class="small muted version">Pin Workflow {chrome.runtime.getManifest().version}</p>
     </div>
   );
 }
 
 // ---------------------------------------------------------------- Data
 
-function DataSection({ data, toast }: { data: AppData; toast: (m: string, k?: 'info' | 'error') => void }) {
+function DataSection({ data, toast }: { data: AppData; toast: ShowToast }) {
   const [usage, setUsage] = useState<{ sync: number; local: number } | null>(null);
   const [pending, setPending] = useState<{ workspaces: Workspace[]; settings: Settings } | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -879,35 +878,40 @@ function DataSection({ data, toast }: { data: AppData; toast: (m: string, k?: 'i
   return (
     <div class="section">
       <h1>{t('Data')}</h1>
-      <Field label={t('Export')} hint={t('Workspaces, rules, schedules and settings. API keys are never exported.')}>
-        <button class="btn" onClick={exportAll}>
-          {t('Download JSON')}
-        </button>
-      </Field>
-      <Field label={t('Import')} hint={t('Replaces your workspaces and settings.')}>
-        <input ref={fileRef} type="file" accept="application/json,.json" onChange={(e) => void onFile((e.target as HTMLInputElement).files?.[0])} />
-      </Field>
-      {pending && (
-        <div class="card row">
-          <span class="grow">{t('Import {0} workspaces and replace the current ones?', pending.workspaces.length)}</span>
-          <button class="btn" onClick={() => setPending(null)}>
-            {t('Cancel')}
+      <div class="card settings-card">
+        <Field label={t('Export')} hint={t('Workspaces, rules, schedules and settings. API keys are never exported.')}>
+          <button class="btn" onClick={exportAll}>
+            {t('Download')}
           </button>
-          <button class="btn primary" onClick={() => void replaceAll(pending.workspaces, pending.settings).then(() => (setPending(null), toast(t('Imported'))))}>
-            {t('Import')}
+        </Field>
+        <Field label={t('Import')} hint={t('Replaces your workspaces and settings.')}>
+          <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => void onFile((e.target as HTMLInputElement).files?.[0])} />
+          <button class="btn" onClick={() => fileRef.current?.click()}>
+            {t('Choose file')}
           </button>
-        </div>
-      )}
-      <Field label={t('Storage')}>
-        <span class="muted">
-          {usage ? t('Synced: {0} KB of 100 KB · Local: {1} KB', (usage.sync / 1024).toFixed(1), (usage.local / 1024).toFixed(1)) : '…'}
-        </span>
-      </Field>
-      <div class="danger-zone">
+        </Field>
+        {pending && (
+          <div class="setting-row">
+            <span class="grow">{t('Import {0} workspaces and replace the current ones?', pending.workspaces.length)}</span>
+            <button class="btn ghost" onClick={() => setPending(null)}>
+              {t('Cancel')}
+            </button>
+            <button class="btn primary" onClick={() => void replaceAll(pending.workspaces, pending.settings).then(() => (setPending(null), toast(t('Imported'))))}>
+              {t('Import')}
+            </button>
+          </div>
+        )}
+        <Field label={t('Storage')}>
+          <span class="muted">
+            {usage ? t('Synced: {0} KB of 100 KB · Local: {1} KB', (usage.sync / 1024).toFixed(1), (usage.local / 1024).toFixed(1)) : ''}
+          </span>
+        </Field>
+      </div>
+      <div class="card settings-card">
         {confirmReset ? (
-          <div class="row">
+          <div class="setting-row">
             <span class="grow">{t('Reset all workspaces, rules and settings to defaults? Archive and timeline are kept.')}</span>
-            <button class="btn" onClick={() => setConfirmReset(false)}>
+            <button class="btn ghost" onClick={() => setConfirmReset(false)}>
               {t('Cancel')}
             </button>
             <button
@@ -921,9 +925,11 @@ function DataSection({ data, toast }: { data: AppData; toast: (m: string, k?: 'i
             </button>
           </div>
         ) : (
-          <button class="btn ghost danger" onClick={() => setConfirmReset(true)}>
-            {t('Reset to defaults')}
-          </button>
+          <Field label={t('Reset settings')} hint={t('Restore workspaces, rules and settings to their defaults')}>
+            <button class="btn" onClick={() => setConfirmReset(true)}>
+              {t('Reset')}
+            </button>
+          </Field>
         )}
       </div>
     </div>

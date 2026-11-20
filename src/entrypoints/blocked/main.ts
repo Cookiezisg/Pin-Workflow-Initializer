@@ -13,7 +13,7 @@ const ALLOW_MINUTES = 10;
 
 document.title = t('{0} is blocked', host);
 document.getElementById('headline')!.textContent = t('{0} is blocked', host);
-document.getElementById('sub')!.textContent = ws ? t('You are in {0}. Stay focused.', ws) : t('Stay focused.');
+document.getElementById('sub')!.textContent = ws ? t('Blocked while you are in {0}', ws) : t('Blocked by a focus rule');
 document.getElementById('rules')!.textContent = t('Edit rules');
 
 const back = document.getElementById('back')!;

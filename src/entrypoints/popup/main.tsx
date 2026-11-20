@@ -68,9 +68,9 @@ function Palette() {
         id: `ws:${w.id}`,
         kind: 'workspace',
         title: isActive ? t('Re-initialize {0}', w.name) : t('Switch to {0}', w.name),
-        subtitle: isActive ? t('Current workspace · pins, groups and clean-up') : t('{0} pins', w.pins.length),
+        subtitle: isActive ? t('Current workspace · pins, groups and clean-up') : t(w.pins.length === 1 ? '1 pin' : '{0} pins', w.pins.length),
         keywords: w.name,
-        icon: <span class="emoji">{w.icon}</span>,
+        icon: <span class={`dot bg-g g-${w.color}`} />,
         hint: i < 9 ? `⌘${i + 1}` : undefined,
         run: async ({ shift }) => {
           const r = isActive || shift ? await call('apply', { workspaceId: w.id }) : await call('switchTo', { workspaceId: w.id });
@@ -153,10 +153,10 @@ function Palette() {
     if (!q) {
       if (prefix) return pool.slice(0, 60).map((item) => ({ item, hits: {} as Record<string, number[]> }));
       const recent = pool.filter((i) => i.kind === 'tab').sort((a, b) => (b.rank ?? 0) - (a.rank ?? 0)).slice(1, 9);
-      return [...pool.filter((i) => i.kind === 'workspace' || i.kind === 'action'), ...recent].map((item) => ({ item, hits: {} as Record<string, number[]> }));
+      return [...pool.filter((i) => i.kind === 'workspace'), ...recent].map((item) => ({ item, hits: {} as Record<string, number[]> }));
     }
     const kindBoost: Record<Kind, number> = { workspace: 1.25, action: 1.15, tab: 1, archived: 0.8 };
-    return rank(pool, q, [
+    const ranked = rank(pool, q, [
       { name: 'title', get: (i) => i.title, weight: 1.2 },
       { name: 'subtitle', get: (i) => i.subtitle, weight: 0.6 },
       { name: 'keywords', get: (i) => i.keywords ?? '', weight: 0.7 },
@@ -164,6 +164,10 @@ function Palette() {
       .map((r) => ({ ...r, score: r.score * kindBoost[r.item.kind] }))
       .sort((a, b) => b.score - a.score)
       .slice(0, 60);
+    // Show results in sections (like Chrome's Tab search); the section holding the best match comes first.
+    const best = new Map<Kind, number>();
+    for (const r of ranked) best.set(r.item.kind, Math.max(best.get(r.item.kind) ?? 0, r.score));
+    return ranked.sort((a, b) => best.get(b.item.kind)! - best.get(a.item.kind)! || b.score - a.score);
   }, [items, query]);
 
   useEffect(() => setSel(0), [query]);
@@ -214,17 +218,17 @@ function Palette() {
     }
   };
 
-  const sections: Record<Kind, string> = { workspace: t('Workspaces'), action: t('Actions'), tab: t('Open tabs'), archived: t('Archive') };
+  const sections: Record<Kind, string> = { workspace: t('Workspaces'), action: t('Actions'), tab: query.trim() ? t('Open tabs') : t('Recent tabs'), archived: t('Archive') };
   let lastKind: Kind | undefined;
 
   return (
     <div class="palette" onKeyDown={onKey}>
       <div class="search">
-        {data?.active && <span class="ws-chip" title={data.active.name}>{data.active.icon}</span>}
+        <Icon name="search" class="search-icon" />
         <input
           ref={inputRef}
           class="q"
-          placeholder={t('Search tabs, workspaces, actions…')}
+          placeholder={t('Search tabs, workspaces and actions')}
           value={query}
           onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
           spellcheck={false}
@@ -235,7 +239,7 @@ function Palette() {
       <div class="list" ref={listRef} role="listbox">
         {results.length === 0 && <div class="empty">{t('No matches')}</div>}
         {results.map((r, i) => {
-          const header = !query.trim() || /^[>@#]$/.test(query.trim()) ? r.item.kind !== lastKind : false;
+          const header = r.item.kind !== lastKind;
           lastKind = r.item.kind;
           return (
             <>
@@ -257,21 +261,11 @@ function Palette() {
                     <Highlight text={r.item.subtitle} indices={r.hits.subtitle} />
                   </div>
                 </span>
-                {query.trim() && <span class="badge">{sections[r.item.kind]}</span>}
                 {r.item.hint && <Kbd>{r.item.hint}</Kbd>}
               </div>
             </>
           );
         })}
-      </div>
-      <div class="footer">
-        <span><Kbd>↵</Kbd> {t('run')}</span>
-        <span><Kbd>⇧↵</Kbd> {t('re-initialize')}</span>
-        <span><Kbd>⌘⌫</Kbd> {t('close tab')}</span>
-        <span class="grow" />
-        <span class="faint">
-          <b>&gt;</b> {t('actions')} · <b>@</b> {t('workspaces')} · <b>#</b> {t('archive')}
-        </span>
       </div>
       {toastEl}
     </div>

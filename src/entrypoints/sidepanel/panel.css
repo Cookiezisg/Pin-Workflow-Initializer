@@ -1,320 +1,248 @@
-body {
-  background: var(--bg-2);
-}
+/* Side panel — modelled on Chrome's Reading list / Bookmarks side panels. */
 .panel {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
 }
-.switcher {
-  display: flex;
-  gap: 6px;
-  padding: 10px 10px 4px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.ws {
+.header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 10px 0 8px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--bg);
-  cursor: pointer;
-  flex: none;
-  transition: border-color 0.12s, box-shadow 0.12s;
+  gap: 8px;
+  padding: 12px 12px 4px 8px;
 }
-.ws:hover {
-  border-color: var(--g);
-}
-.ws[aria-current='true'] {
-  border-color: var(--g);
-  box-shadow: inset 0 0 0 1px var(--g);
-  font-weight: 600;
-}
-.ws-icon {
+.ws-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 220px;
+  height: 36px;
+  padding: 0 8px 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
   font-size: 15px;
-  line-height: 1;
-  display: grid;
-  place-items: center;
-  width: 18px;
+  font-weight: 500;
+  cursor: pointer;
 }
+.ws-picker:hover {
+  background: var(--hover);
+}
+.ws-picker .icon {
+  color: var(--text-2);
+}
+
 .tabs {
   display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 6px 10px 0;
-  border-bottom: 1px solid var(--line);
+  gap: 4px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--divider);
 }
 .tab {
-  height: 32px;
-  padding: 0 10px;
+  position: relative;
+  height: 40px;
+  padding: 0 12px;
   border: 0;
-  border-bottom: 2px solid transparent;
   background: none;
-  color: var(--fg-2);
-  cursor: pointer;
+  color: var(--text-2);
   font-weight: 500;
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+}
+.tab:hover {
+  background: var(--hover);
 }
 .tab[aria-selected='true'] {
-  color: var(--fg);
-  border-bottom-color: var(--accent);
+  color: var(--primary);
 }
+.tab[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 0;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--primary);
+}
+
 .body {
-  padding: 12px 10px 40px;
+  padding: 4px 8px 48px;
 }
-.hero {
-  padding: 14px;
-  border-radius: 14px;
-  background: var(--bg);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow);
+.toolbar {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  padding: 0 4px 0 12px;
 }
-.hero-icon {
-  font-size: 28px;
-  line-height: 1;
-}
-.hero-name {
-  font-size: 17px;
-  font-weight: 700;
-}
-.wrap {
-  flex-wrap: wrap;
-}
-.accent {
-  color: var(--accent);
-}
-.danger {
-  color: var(--danger);
-}
-.nowrap {
-  white-space: nowrap;
-}
-.pad {
-  padding: 4px 8px;
-}
-.label {
-  padding: 6px 4px 4px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--fg-3);
-}
+
+/* Pinned: a quiet strip of favicons, like the bookmarks bar */
 .pins {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 2px;
+  padding: 0 4px;
 }
 .pin {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--bg);
+  border: 0;
+  border-radius: 50%;
+  background: none;
   cursor: pointer;
+}
+.pin:hover {
+  background: var(--hover);
 }
 .pin[aria-current='true'] {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft);
+  background: var(--primary-container);
 }
-.group {
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 2px 4px 4px;
-}
+
 .group-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 4px;
-  cursor: pointer;
+  margin-top: 8px;
+  gap: 8px;
   user-select: none;
 }
-.group-title {
-  font-weight: 600;
-  color: var(--g);
-}
-.chev {
-  transition: transform 0.12s;
-  color: var(--fg-3);
-}
-.chev.open {
-  transform: rotate(90deg);
-}
-.tabrow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 30px;
-  padding: 0 6px;
-  border-radius: 7px;
-  cursor: pointer;
-}
-.tabrow:hover {
-  background: var(--bg-3);
+.group-head .chip {
+  max-width: 220px;
 }
 .tabrow[aria-current='true'] {
-  background: var(--accent-soft);
+  background: var(--primary-container);
+  color: var(--on-primary-container);
 }
-.tab-actions {
-  display: none;
+.row-actions {
+  display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 0;
+  margin-right: -4px;
 }
-.tabrow:hover .tab-actions {
-  display: flex;
+
+.list-row.two-line {
+  min-height: 48px;
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
-.send {
-  height: 24px;
-  width: 30px;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  color: var(--fg-2);
-  border-radius: 6px;
+
+/* Inline note: AI recap, dry-run preview. Plain text on a tinted surface — no borders, no icons. */
+.note {
+  margin: 4px 4px 8px;
+  padding: 8px 8px 12px 16px;
+  border-radius: 12px;
+  background: var(--surface-2);
 }
-.send:hover {
-  background: var(--bg-2);
+.note p {
+  margin: 0 8px 8px 0;
 }
-.preview {
-  border-top: 1px dashed var(--line);
-  padding-top: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.ops {
-  margin: 0;
-  padding-left: 20px;
-  max-height: 220px;
-  overflow: auto;
-  font-size: 12.5px;
-}
-.ai {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.ai-off {
-  justify-content: flex-start;
-  color: var(--fg-2);
-}
-.ai-out p {
-  margin: 0 0 6px;
-}
-.ai-out ul {
-  margin: 0 0 6px;
+.note ul {
+  margin: 0 8px 8px 0;
   padding-left: 18px;
 }
-.ai-out .next {
-  color: var(--accent);
+.note-head {
+  margin-bottom: 4px;
 }
+.note-actions {
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}
+.ops {
+  max-height: 240px;
+  overflow: auto;
+}
+
 .suggest {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
+  padding-bottom: 8px;
 }
 .sg {
-  display: flex;
   align-items: flex-start;
-  gap: 8px;
-  padding: 6px;
-  border-radius: 8px;
-  background: var(--bg-2);
-  cursor: pointer;
+  padding-top: 8px;
+  padding-bottom: 8px;
 }
-.sg .dot {
-  margin-top: 4px;
+.sg input {
+  margin-top: 2px;
+}
+.sg-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
 }
 .sg-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 3px;
-  margin-top: 3px;
+  gap: 6px;
 }
+
 .searchbox {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 34px;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--bg);
-  color: var(--fg-3);
+  height: 40px;
+  margin: 8px 4px 4px;
+  padding: 0 4px 0 14px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+.searchbox:focus-within {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 2px var(--primary);
 }
 .searchbox input {
+  height: 100%;
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--fg);
+  color: var(--text);
 }
-.timeline {
-  list-style: none;
-  margin: 0;
-  padding: 0 0 0 14px;
-  border-left: 2px solid var(--line);
+.searchbox input::placeholder {
+  color: var(--text-2);
 }
-.timeline li {
+
+/* Archive rows: favicon turns into a checkbox on hover, or always while selecting (like Gmail). */
+.lead {
   position: relative;
-  padding: 8px 8px 10px;
-  margin-bottom: 4px;
-  border-radius: 8px;
-  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  flex: none;
 }
-.timeline li:hover {
-  background: var(--bg);
-}
-.timeline li::before {
-  content: '';
+.lead > * {
   position: absolute;
-  left: -21px;
-  top: 13px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--bg-2);
-  border: 2px solid var(--fg-3);
+  inset: 0;
 }
-.timeline li.undone {
-  opacity: 0.55;
+.lead input {
+  visibility: hidden;
 }
-.r-apply,
-.r-switch {
-  background: var(--accent-soft);
-  color: var(--accent);
+.list-row:hover .lead input,
+.selecting .lead input {
+  visibility: visible;
 }
-.r-manual {
-  background: rgba(24, 128, 56, 0.12);
-  color: var(--ok);
+.list-row:hover .lead .favicon,
+.selecting .lead .favicon {
+  visibility: hidden;
 }
-.r-ai {
-  background: rgba(147, 52, 230, 0.12);
-  color: var(--g-purple);
+.footer-actions {
+  justify-content: flex-end;
+  padding: 12px 4px;
+}
+
+.snap.undone .list-row {
+  opacity: 0.6;
 }
 .snap-detail {
-  margin-top: 8px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  cursor: default;
+  padding: 4px 12px 12px;
 }
 .snap-icons {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 4px;
-}
-.snap-icons .pinned {
-  outline: 2px solid var(--accent-soft);
-  border-radius: 3px;
+  gap: 8px;
 }

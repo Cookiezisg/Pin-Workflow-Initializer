@@ -137,7 +137,7 @@ export default defineBackground(() => {
         if (await hostAllowed(url)) return;
         const current = await activeId();
         const ws = (await chromeStore.getWorkspaces()).find((w) => w.id === current);
-        const q = new URLSearchParams({ url, ws: ws ? `${ws.icon} ${ws.name}` : '' });
+        const q = new URLSearchParams({ url, ws: ws?.name ?? '' });
         await chrome.tabs.update(tabId, { url: `${chrome.runtime.getURL('/blocked.html')}?${q}` });
       } else if (action.type === 'pin') {
         if (!tab.pinned) await chrome.tabs.update(tabId, { pinned: true });
