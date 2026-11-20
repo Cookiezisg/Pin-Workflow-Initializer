@@ -3,7 +3,7 @@
     "message": "Pin Workflow Initializer"
   },
   "extDescription": {
-    "message": "Chrome 工作区引擎：声明式固定标签页、秒切工作区、可撤销时间线、命令面板、规则与 AI 分组。"
+    "message": "标签页的工作区：一键设好固定标签和分组，秒切工作区，可撤销时间线，命令面板，规则，AI 分组。"
   },
   "actionTitle": {
     "message": "Pin Workflow — 命令面板"

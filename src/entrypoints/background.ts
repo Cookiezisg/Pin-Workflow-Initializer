@@ -1,15 +1,10 @@
 import { normalizeUrl, hostOf } from '../core/match';
 import { evaluateRules } from '../core/rules';
-import type { GroupColor, Settings, Workspace } from '../core/types';
+import type { Settings, Workspace } from '../core/types';
 import { chromeApi } from '../engine/chrome-api';
 import { chromeStore, ensureInitialized, KEYS } from '../engine/chrome-store';
 import { Engine } from '../engine/engine';
 import type { RpcMap, RpcName, RpcRequest, RpcResponse } from '../lib/rpc';
-
-const COLOR_HEX: Record<GroupColor, string> = {
-  grey: '#5f6368', blue: '#1a73e8', red: '#d93025', yellow: '#f9ab00', green: '#188038',
-  pink: '#d01884', purple: '#9334e6', cyan: '#007b83', orange: '#fa903e',
-};
 
 export default defineBackground(() => {
   const notify = (title: string, message: string) => {
@@ -39,8 +34,8 @@ export default defineBackground(() => {
 
   // ------------------------------------------------------------ badge
   async function showWorkspace(ws: Workspace) {
-    await chrome.action.setBadgeText({ text: ws.icon });
-    await chrome.action.setBadgeBackgroundColor({ color: COLOR_HEX[ws.color] });
+    // No badge: the active workspace shows in the tooltip only (clears badges left by older versions).
+    await chrome.action.setBadgeText({ text: '' });
     await chrome.action.setTitle({ title: `Pin Workflow · ${ws.name}` });
   }
   async function refreshBadge() {
